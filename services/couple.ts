@@ -1,13 +1,23 @@
+import { randomInt } from "crypto";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getUserProfile } from "@/services/user";
 import type { Couple, InviteCode, PartnerProfile } from "@/types/couple";
 import type { UserProfile } from "@/types/user";
 
+const MAX_FAILED_ATTEMPTS = 5;
+const BLOCK_DURATION_MS = 5 * 60 * 1000;
+
+interface InviteAttemptRecord {
+  blockedUntil: string | null;
+  failedCount: number;
+  lastAttemptAt: string;
+}
+
 function generateRandomCode(length = 6): string {
   const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
   let code = "";
   for (let i = 0; i < length; i += 1) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += chars.charAt(randomInt(0, chars.length));
   }
   return code;
 }
@@ -87,16 +97,47 @@ export async function acceptInviteCode(
   const db = getAdminDb();
   const cleanCode = code.trim().toUpperCase();
   const inviteRef = db.collection("invites").doc(cleanCode);
+  const attemptRef = db.collection("invite_attempts").doc(acceptorUid);
 
   return db.runTransaction(async (transaction) => {
+    const attemptSnapshot = await transaction.get(attemptRef);
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    if (attemptSnapshot.exists) {
+      const attemptData = attemptSnapshot.data() as InviteAttemptRecord;
+      if (attemptData.blockedUntil && nowIso < attemptData.blockedUntil) {
+        throw new Error(
+          "초대 코드 입력 시도 횟수를 초과했습니다. 잠시 후 다시 시도해 주세요.",
+        );
+      }
+    }
+
+    const recordFailedAttempt = () => {
+      const currentFailed = attemptSnapshot.exists
+        ? (attemptSnapshot.data() as InviteAttemptRecord).failedCount || 0
+        : 0;
+      const nextFailed = currentFailed + 1;
+      const isBlocked = nextFailed >= MAX_FAILED_ATTEMPTS;
+
+      transaction.set(attemptRef, {
+        blockedUntil: isBlocked
+          ? new Date(now.getTime() + BLOCK_DURATION_MS).toISOString()
+          : null,
+        failedCount: isBlocked ? 0 : nextFailed,
+        lastAttemptAt: nowIso,
+      });
+    };
+
     const inviteSnapshot = await transaction.get(inviteRef);
     if (!inviteSnapshot.exists) {
+      recordFailedAttempt();
       throw new Error("유효하지 않은 초대 코드입니다.");
     }
 
     const invite = inviteSnapshot.data() as InviteCode;
-    const now = new Date().toISOString();
-    if (now > invite.expiresAt) {
+    if (nowIso > invite.expiresAt) {
+      recordFailedAttempt();
       throw new Error("만료된 초대 코드입니다.");
     }
 
@@ -127,14 +168,21 @@ export async function acceptInviteCode(
     const newCouple: Couple = {
       id: coupleRef.id,
       memberUids: [invite.creatorUid, acceptorUid],
-      createdAt: now,
-      updatedAt: now,
+      createdAt: nowIso,
+      updatedAt: nowIso,
     };
 
     transaction.set(coupleRef, newCouple);
-    transaction.update(creatorRef, { coupleId: coupleRef.id, updatedAt: now });
-    transaction.update(acceptorRef, { coupleId: coupleRef.id, updatedAt: now });
+    transaction.update(creatorRef, {
+      coupleId: coupleRef.id,
+      updatedAt: nowIso,
+    });
+    transaction.update(acceptorRef, {
+      coupleId: coupleRef.id,
+      updatedAt: nowIso,
+    });
     transaction.delete(inviteRef);
+    transaction.delete(attemptRef);
 
     const partner: PartnerProfile = {
       uid: creatorData.uid,
