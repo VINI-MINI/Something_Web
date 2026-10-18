@@ -1,4 +1,5 @@
 import { getAdminDb } from "@/lib/firebase/admin";
+import { getUserProfile } from "@/services/user";
 import type { Couple, InviteCode, PartnerProfile } from "@/types/couple";
 import type { UserProfile } from "@/types/user";
 
@@ -14,6 +15,11 @@ function generateRandomCode(length = 6): string {
 export async function createInviteCode(
   creatorUid: string,
 ): Promise<InviteCode> {
+  const creator = await getUserProfile(creatorUid);
+  if (creator?.coupleId) {
+    throw new Error("이미 커플로 연결된 사용자입니다.");
+  }
+
   const existingInvite = await getActiveInviteCode(creatorUid);
   if (existingInvite) {
     return existingInvite;
@@ -47,6 +53,11 @@ export async function createInviteCode(
 export async function getActiveInviteCode(
   creatorUid: string,
 ): Promise<InviteCode | null> {
+  const creator = await getUserProfile(creatorUid);
+  if (creator?.coupleId) {
+    return null;
+  }
+
   const db = getAdminDb();
   const snapshot = await db
     .collection("invites")
