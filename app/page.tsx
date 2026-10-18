@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { Suspense } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LoginView } from "@/components/auth/LoginView";
 import { CoupleConnectView } from "@/components/couple/CoupleConnectView";
@@ -31,7 +32,15 @@ export default function Home() {
   if (!user.coupleId) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
-        <CoupleConnectView />
+        <Suspense
+          fallback={
+            <div className="flex w-full max-w-sm flex-col items-center justify-center p-8 text-sm text-zinc-500 dark:text-zinc-400">
+              불러오는 중...
+            </div>
+          }
+        >
+          <CoupleConnectView />
+        </Suspense>
 
         <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
           <span>{user.displayName ?? user.email} 계정으로 로그인됨</span>
