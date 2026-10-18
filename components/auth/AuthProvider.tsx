@@ -34,7 +34,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let currentSessionId = 0;
+
     const unsubscribe = subscribeAuthState(async (authUser) => {
+      const sessionId = ++currentSessionId;
+
       if (!authUser) {
         setUser(null);
         setLoading(false);
@@ -43,21 +47,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const token = await getIdToken();
+        if (sessionId !== currentSessionId) {
+          return;
+        }
+
         if (token) {
           const profile = await syncUserProfileAction(token);
+          if (sessionId !== currentSessionId) {
+            return;
+          }
           setUser(profile);
         } else {
           setUser(null);
         }
       } catch (error) {
+        if (sessionId !== currentSessionId) {
+          return;
+        }
         console.error("Failed to sync user profile:", error);
         setUser(null);
       } finally {
-        setLoading(false);
+        if (sessionId === currentSessionId) {
+          setLoading(false);
+        }
       }
     });
 
     return () => {
+      currentSessionId += 1;
       unsubscribe();
     };
   }, []);
