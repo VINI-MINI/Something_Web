@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -33,12 +34,12 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const sessionIdRef = useRef(0);
 
   useEffect(() => {
-    let currentSessionId = 0;
-
     const unsubscribe = subscribeAuthState(async (authUser) => {
-      const sessionId = ++currentSessionId;
+      sessionIdRef.current += 1;
+      const sessionId = sessionIdRef.current;
 
       if (!authUser) {
         setUser(null);
@@ -48,13 +49,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const token = await getIdToken();
-        if (sessionId !== currentSessionId) {
+        if (sessionId !== sessionIdRef.current) {
           return;
         }
 
         if (token) {
           const profile = await syncUserProfileAction(token);
-          if (sessionId !== currentSessionId) {
+          if (sessionId !== sessionIdRef.current) {
             return;
           }
           setUser(profile);
@@ -62,20 +63,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
         }
       } catch (error) {
-        if (sessionId !== currentSessionId) {
+        if (sessionId !== sessionIdRef.current) {
           return;
         }
         console.error("Failed to sync user profile:", error);
         setUser(null);
       } finally {
-        if (sessionId === currentSessionId) {
+        if (sessionId === sessionIdRef.current) {
           setLoading(false);
         }
       }
     });
 
     return () => {
-      currentSessionId += 1;
+      sessionIdRef.current += 1;
       unsubscribe();
     };
   }, []);
@@ -91,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const handleSignOut = useCallback(async () => {
+    sessionIdRef.current += 1;
     setLoading(true);
     try {
       await authSignOut();
@@ -101,14 +103,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const handleRefreshProfile = useCallback(async (): Promise<UserProfile | null> => {
+    const sessionId = sessionIdRef.current;
     try {
       const token = await getIdToken();
+      if (sessionId !== sessionIdRef.current) {
+        return null;
+      }
+
       if (token) {
         const profile = await syncUserProfileAction(token);
+        if (sessionId !== sessionIdRef.current) {
+          return null;
+        }
         setUser(profile);
         return profile;
       }
     } catch (error) {
+      if (sessionId !== sessionIdRef.current) {
+        return null;
+      }
       console.error("Failed to refresh user profile:", error);
     }
     return null;
