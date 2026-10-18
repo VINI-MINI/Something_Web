@@ -25,6 +25,7 @@ interface AuthContextValue {
   loading: boolean;
   signIn: (provider: AuthProviderEnum) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<UserProfile | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -99,6 +100,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const handleRefreshProfile = useCallback(async (): Promise<UserProfile | null> => {
+    try {
+      const token = await getIdToken();
+      if (token) {
+        const profile = await syncUserProfileAction(token);
+        setUser(profile);
+        return profile;
+      }
+    } catch (error) {
+      console.error("Failed to refresh user profile:", error);
+    }
+    return null;
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -106,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         signIn: handleSignIn,
         signOut: handleSignOut,
+        refreshProfile: handleRefreshProfile,
       }}
     >
       {children}
