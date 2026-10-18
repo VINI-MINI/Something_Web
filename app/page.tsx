@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LoginView } from "@/components/auth/LoginView";
 
@@ -29,11 +30,12 @@ export default function Home() {
       <div className="flex w-full max-w-sm flex-col items-center gap-6 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex flex-col items-center gap-3 text-center">
           {user.photoURL ? (
-            <img
+            <Image
               src={user.photoURL}
               alt={user.displayName ?? "프로필"}
+              width={64}
+              height={64}
               className="h-16 w-16 rounded-full object-cover"
-              referrerPolicy="no-referrer"
             />
           ) : (
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-200 text-xl font-bold text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
