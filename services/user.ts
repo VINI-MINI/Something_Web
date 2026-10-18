@@ -15,34 +15,39 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 export async function upsertUserProfile(user: AuthUser): Promise<UserProfile> {
   const db = getAdminDb();
   const userRef = db.collection("users").doc(user.uid);
-  const snapshot = await userRef.get();
   const now = new Date().toISOString();
 
-  if (!snapshot.exists) {
-    const newProfile: UserProfile = {
-      uid: user.uid,
+  return db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(userRef);
+
+    if (!snapshot.exists) {
+      const newProfile: UserProfile = {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        coupleId: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      transaction.set(userRef, newProfile);
+      return newProfile;
+    }
+
+    const existingData = snapshot.data() as UserProfile;
+    transaction.update(userRef, {
       email: user.email,
       displayName: user.displayName,
       photoURL: user.photoURL,
-      coupleId: null,
-      createdAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      ...existingData,
+      email: user.email,
+      displayName: user.displayName,
+      photoURL: user.photoURL,
       updatedAt: now,
     };
-    await userRef.set(newProfile);
-    return newProfile;
-  }
-
-  const existingData = snapshot.data() as UserProfile;
-  const updatedProfile: UserProfile = {
-    uid: user.uid,
-    email: user.email,
-    displayName: user.displayName,
-    photoURL: user.photoURL,
-    coupleId: existingData.coupleId ?? null,
-    createdAt: existingData.createdAt,
-    updatedAt: now,
-  };
-
-  await userRef.set(updatedProfile);
-  return updatedProfile;
+  });
 }
