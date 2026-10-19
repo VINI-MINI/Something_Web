@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { LoginView } from "@/components/auth/LoginView";
 import { CoupleConnectView } from "@/components/couple/CoupleConnectView";
 import { useCouple } from "@/components/couple/CoupleProvider";
+import { MemoListView } from "@/components/memo/MemoListView";
 
 export default function Home() {
   const { loading: authLoading, signOut, user } = useAuth();
@@ -58,74 +59,61 @@ export default function Home() {
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center p-6">
-      <div className="flex w-full max-w-sm flex-col items-center gap-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="flex flex-col items-center gap-1 text-center">
-          <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
-            커플 연결 완료
-          </span>
-          <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 mt-1">
-            우리만의 메모 공간
-          </h2>
-        </div>
-
-        {/* 두 사람 프로필 카드 */}
-        <div className="flex w-full items-center justify-around rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/60">
-          {/* 나 */}
-          <div className="flex flex-col items-center gap-1.5 text-center">
+    <main className="flex flex-1 flex-col items-center mx-auto w-full max-w-2xl p-4 sm:p-6 gap-6">
+      {/* 상단 커플 상태 & 프로필 바 */}
+      <header className="flex w-full items-center justify-between rounded-2xl border border-zinc-200 bg-white p-3.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="flex items-center gap-3">
+          {/* 두 사람 작은 프로필 아바타 */}
+          <div className="flex items-center -space-x-2">
             {user.photoURL ? (
               <Image
                 src={user.photoURL}
                 alt={user.displayName ?? "나"}
-                width={56}
-                height={56}
-                className="h-14 w-14 rounded-full object-cover"
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-full border-2 border-white object-cover dark:border-zinc-900"
               />
             ) : (
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-zinc-200 text-lg font-bold text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-zinc-200 text-xs font-bold text-zinc-600 dark:border-zinc-900 dark:bg-zinc-700 dark:text-zinc-300">
                 {(user.displayName ?? user.email ?? "?")[0]}
               </div>
             )}
-            <span className="max-w-[80px] truncate text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-              {user.displayName ?? "나"}
-            </span>
-          </div>
-
-          <span className="text-2xl animate-pulse">❤️</span>
-
-          {/* 상대방 */}
-          <div className="flex flex-col items-center gap-1.5 text-center">
             {partner?.photoURL ? (
               <Image
                 src={partner.photoURL}
                 alt={partner.displayName ?? "파트너"}
-                width={56}
-                height={56}
-                className="h-14 w-14 rounded-full object-cover"
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-full border-2 border-white object-cover dark:border-zinc-900"
               />
             ) : (
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-zinc-200 text-lg font-bold text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-zinc-200 text-xs font-bold text-zinc-600 dark:border-zinc-900 dark:bg-zinc-700 dark:text-zinc-300">
                 {(partner?.displayName ?? "?")[0]}
               </div>
             )}
-            <span className="max-w-[80px] truncate text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-              {partner?.displayName ?? "상대방"}
+          </div>
+
+          <div className="flex flex-col">
+            <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+              {user.displayName ?? "나"} & {partner?.displayName ?? "상대방"}
+            </span>
+            <span className="text-[11px] text-zinc-400">
+              함께 쓰는 메모 공간
             </span>
           </div>
         </div>
 
-        <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
-          다음 단계에서 함께 작성하는 실시간 공유 메모 기능이 추가될 예정입니다.
-        </p>
-
         <button
           type="button"
           onClick={() => signOut()}
-          className="flex h-10 w-full items-center justify-center rounded-xl border border-zinc-300 bg-white text-xs font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          className="rounded-lg px-2.5 py-1 text-xs text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
         >
           로그아웃
         </button>
-      </div>
+      </header>
+
+      {/* 공유 메모 목록 뷰 */}
+      <MemoListView />
     </main>
   );
 }
