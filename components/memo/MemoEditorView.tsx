@@ -22,12 +22,19 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const loadedMemoIdRef = useRef<string | null>(null);
+  const saveRevisionRef = useRef(0);
   const lastSavedRef = useRef<{ title: string; content: string }>({
     title: "",
     content: "",
   });
 
   useEffect(() => {
+    // memoId가 바뀌지 않았고 이미 하이드레이션되었다면 재로드를 방지하여 작성 중인 상태를 보존
+    if (loadedMemoIdRef.current === memoId) {
+      return;
+    }
+
     let isCancelled = false;
 
     async function loadData() {
@@ -40,6 +47,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
           title: cached.title,
           content: cached.content,
         };
+        loadedMemoIdRef.current = memoId;
         setInitialLoaded(true);
         return;
       }
@@ -58,6 +66,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
           content: fetched.content,
         };
       }
+      loadedMemoIdRef.current = memoId;
       setInitialLoaded(true);
     }
 
@@ -78,6 +87,9 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
         return;
       }
 
+      saveRevisionRef.current += 1;
+      const currentRevision = saveRevisionRef.current;
+
       setSaveStatus("saving");
       setErrorMessage(null);
       try {
@@ -85,9 +97,17 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
           title: newTitle,
           content: newContent,
         });
+
+        if (currentRevision !== saveRevisionRef.current) {
+          return;
+        }
+
         lastSavedRef.current = { title: newTitle, content: newContent };
         setSaveStatus("saved");
       } catch (error) {
+        if (currentRevision !== saveRevisionRef.current) {
+          return;
+        }
         console.error("Failed to save memo:", error);
         setSaveStatus("error");
         setErrorMessage("저장에 실패했습니다. 다시 시도해 주세요.");
