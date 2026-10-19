@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useMemoContext } from "@/components/memo/MemoProvider";
@@ -87,21 +88,26 @@ export function MemoListView() {
       : "내용 없음";
 
     return (
-      <div
+      <article
         key={memo.id}
-        onClick={() => router.push(`/memo/${memo.id}`)}
-        className="group relative flex cursor-pointer flex-col justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-4 text-left shadow-sm transition hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+        className="group relative flex flex-col justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-4 text-left shadow-sm transition hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
       >
         <div className="flex flex-col gap-1.5">
           <div className="flex items-start justify-between gap-2">
             <h3 className="line-clamp-1 font-semibold text-zinc-900 dark:text-zinc-100">
-              {memo.title || "제목 없는 메모"}
+              <Link
+                href={`/memo/${memo.id}`}
+                className="focus:outline-none after:absolute after:inset-0 after:rounded-2xl"
+              >
+                {memo.title || "제목 없는 메모"}
+              </Link>
             </h3>
             <button
               type="button"
               onClick={(e) => handleTogglePin(e, memo)}
               title={memo.isPinned ? "고정 해제" : "상단 고정"}
-              className={`text-sm transition ${
+              aria-label={memo.isPinned ? "고정 해제" : "상단 고정"}
+              className={`relative z-10 text-sm transition ${
                 memo.isPinned
                   ? "text-amber-500 hover:text-amber-600"
                   : "text-zinc-300 opacity-60 hover:text-zinc-500 hover:opacity-100 dark:text-zinc-600 dark:hover:text-zinc-400"
@@ -120,13 +126,14 @@ export function MemoListView() {
           <button
             type="button"
             onClick={(e) => handleDeleteMemo(e, memo)}
-            className="text-zinc-400 opacity-0 transition hover:text-rose-500 group-hover:opacity-100 dark:text-zinc-500 dark:hover:text-rose-400"
+            className="relative z-10 text-zinc-400 opacity-0 transition hover:text-rose-500 group-hover:opacity-100 focus:opacity-100 dark:text-zinc-500 dark:hover:text-rose-400"
             title="메모 삭제"
+            aria-label={`'${memo.title || "제목 없는 메모"}' 삭제`}
           >
             삭제
           </button>
         </div>
-      </div>
+      </article>
     );
   };
 
