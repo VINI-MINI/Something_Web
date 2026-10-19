@@ -47,6 +47,8 @@ export function MemoProvider({ children }: { children: ReactNode }) {
   const [memos, setMemos] = useState<Memo[]>([]);
   const [loading, setLoading] = useState(false);
   const sessionIdRef = useRef(0);
+  const memosRef = useRef<Memo[]>([]);
+  memosRef.current = memos;
 
   const loadMemos = useCallback(async () => {
     sessionIdRef.current += 1;
@@ -99,6 +101,7 @@ export function MemoProvider({ children }: { children: ReactNode }) {
       }
 
       const newMemo = await createMemoAction(token, input);
+      sessionIdRef.current += 1;
       setMemos((prev) => sortMemos([newMemo, ...prev]));
       return newMemo;
     },
@@ -113,6 +116,7 @@ export function MemoProvider({ children }: { children: ReactNode }) {
       }
 
       const updated = await updateMemoAction(token, memoId, input);
+      sessionIdRef.current += 1;
       setMemos((prev) =>
         sortMemos(prev.map((item) => (item.id === memoId ? updated : item))),
       );
@@ -128,15 +132,13 @@ export function MemoProvider({ children }: { children: ReactNode }) {
     }
 
     await deleteMemoAction(token, memoId);
+    sessionIdRef.current += 1;
     setMemos((prev) => prev.filter((item) => item.id !== memoId));
   }, []);
 
-  const getMemoById = useCallback(
-    (memoId: string): Memo | undefined => {
-      return memos.find((item) => item.id === memoId);
-    },
-    [memos],
-  );
+  const getMemoById = useCallback((memoId: string): Memo | undefined => {
+    return memosRef.current.find((item) => item.id === memoId);
+  }, []);
 
   const fetchMemo = useCallback(
     async (memoId: string): Promise<Memo | null> => {
