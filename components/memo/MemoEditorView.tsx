@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMemoContext } from "@/components/memo/MemoProvider";
 import { subscribeMemo } from "@/services/memoClient";
+import type { Memo } from "@/types/memo";
 
 interface MemoEditorViewProps {
   memoId: string;
@@ -21,6 +22,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   const [isPinned, setIsPinned] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [conflictMemo, setConflictMemo] = useState<Memo | null>(null);
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const loadedMemoIdRef = useRef<string | null>(null);
@@ -56,8 +58,19 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
           return;
         }
 
-        // 실시간 원격 변경사항 도착: 편집 중이 아닌 경우 즉시 화면에 동기화
+        // 원격 내용 변경 여부 확인
+        const isContentDifferent =
+          remoteMemo.title !== lastSavedRef.current.title ||
+          remoteMemo.content !== lastSavedRef.current.content;
+
+        if (!isContentDifferent) {
+          setIsPinned(remoteMemo.isPinned);
+          return;
+        }
+
+        // 실시간 원격 변경사항 도착:
         if (saveStatusRef.current === "saved") {
+          // 비편집 상태: 즉시 화면에 자동 동기화
           setTitle(remoteMemo.title);
           setContent(remoteMemo.content);
           setIsPinned(remoteMemo.isPinned);
@@ -65,6 +78,10 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
             title: remoteMemo.title,
             content: remoteMemo.content,
           };
+          setConflictMemo(null);
+        } else {
+          // 내가 편집 중(타이핑 또는 저장 진행 중): 사용자 작성 내용 보호를 위해 충돌 감지
+          setConflictMemo(remoteMemo);
         }
       },
       (error) => {
@@ -183,6 +200,56 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
     }
   };
 
+  const handleMergeAppend = async () => {
+    if (!conflictMemo) {
+      return;
+    }
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    const remoteContent = conflictMemo.content.trim();
+    const localContent = content.trim();
+
+    let mergedContent = "";
+    if (remoteContent && localContent) {
+      mergedContent = `${remoteContent}\n\n---\n\n${localContent}`;
+    } else {
+      mergedContent = remoteContent || localContent;
+    }
+
+    const mergedTitle = title.trim() || conflictMemo.title;
+
+    setTitle(mergedTitle);
+    setContent(mergedContent);
+    setConflictMemo(null);
+
+    await saveChanges(mergedTitle, mergedContent);
+  };
+
+  const handleAcceptRemote = () => {
+    if (!conflictMemo) {
+      return;
+    }
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    setTitle(conflictMemo.title);
+    setContent(conflictMemo.content);
+    setIsPinned(conflictMemo.isPinned);
+    lastSavedRef.current = {
+      title: conflictMemo.title,
+      content: conflictMemo.content,
+    };
+    setSaveStatus("saved");
+    setConflictMemo(null);
+  };
+
+  const handleDismissConflict = () => {
+    setConflictMemo(null);
+  };
+
   if (!initialLoaded) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center p-6">
@@ -277,6 +344,56 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
           </button>
         </div>
       </div>
+
+      {/* 동시 편집 충돌 알림 배너 */}
+      {conflictMemo && (
+        <div className="mt-3 flex flex-col gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 font-semibold">
+              <span className="text-base">💡</span>
+              <span>상대방이 새로운 내용을 저장했습니다.</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleDismissConflict}
+              className="rounded p-1 text-amber-600 hover:bg-amber-100 hover:text-amber-900 dark:text-amber-400 dark:hover:bg-amber-900/50"
+              title="알림 닫기"
+            >
+              ✕
+            </button>
+          </div>
+
+          <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-300/90">
+            작성 중인 내용의 유실을 방지하기 위해 자동 덮어쓰기를 멈췄습니다. 내용을 어떻게 반영할까요?
+          </p>
+
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleMergeAppend}
+              className="flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 font-semibold text-white shadow-sm transition hover:bg-amber-700 dark:bg-amber-500 dark:text-zinc-950 dark:hover:bg-amber-400"
+            >
+              <span>🧩 아래에 이어붙여서 합치기 (추천)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleAcceptRemote}
+              className="rounded-lg border border-amber-300 bg-white/80 px-2.5 py-1.5 font-medium text-amber-800 transition hover:bg-white dark:border-amber-800 dark:bg-zinc-900 dark:text-amber-300 dark:hover:bg-zinc-800"
+            >
+              상대방 내용으로 바꾸기
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDismissConflict}
+              className="px-2 py-1.5 text-amber-600 underline hover:text-amber-800 dark:text-amber-400"
+            >
+              내 내용 계속 작성
+            </button>
+          </div>
+        </div>
+      )}
 
       {errorMessage && (
         <div className="mt-2 rounded-xl bg-rose-50 p-2.5 text-xs text-rose-600 dark:bg-rose-950/40 dark:text-rose-400">
