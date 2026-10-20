@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMemoContext } from "@/components/memo/MemoProvider";
+import { subscribeMemo } from "@/services/memoClient";
 
 interface MemoEditorViewProps {
   memoId: string;
@@ -12,7 +13,7 @@ type SaveStatus = "saved" | "saving" | "unsaved" | "error";
 
 export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   const router = useRouter();
-  const { deleteMemo, fetchMemo, getMemoById, updateMemo } = useMemoContext();
+  const { deleteMemo, getMemoById, updateMemo } = useMemoContext();
 
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [title, setTitle] = useState("");
@@ -24,58 +25,58 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const loadedMemoIdRef = useRef<string | null>(null);
   const saveRevisionRef = useRef(0);
+  const saveStatusRef = useRef<SaveStatus>("saved");
+  saveStatusRef.current = saveStatus;
+
   const lastSavedRef = useRef<{ title: string; content: string }>({
     title: "",
     content: "",
   });
 
   useEffect(() => {
-    // memoId가 바뀌지 않았고 이미 하이드레이션되었다면 재로드를 방지하여 작성 중인 상태를 보존
-    if (loadedMemoIdRef.current === memoId) {
-      return;
-    }
+    const unsubscribe = subscribeMemo(
+      memoId,
+      (remoteMemo) => {
+        if (!remoteMemo) {
+          setInitialLoaded(true);
+          return;
+        }
 
-    let isCancelled = false;
+        // 최초 하이드레이션 시점
+        if (loadedMemoIdRef.current !== memoId) {
+          setTitle(remoteMemo.title);
+          setContent(remoteMemo.content);
+          setIsPinned(remoteMemo.isPinned);
+          lastSavedRef.current = {
+            title: remoteMemo.title,
+            content: remoteMemo.content,
+          };
+          loadedMemoIdRef.current = memoId;
+          setInitialLoaded(true);
+          return;
+        }
 
-    async function loadData() {
-      const cached = getMemoById(memoId);
-      if (cached) {
-        setTitle(cached.title);
-        setContent(cached.content);
-        setIsPinned(cached.isPinned);
-        lastSavedRef.current = {
-          title: cached.title,
-          content: cached.content,
-        };
-        loadedMemoIdRef.current = memoId;
+        // 실시간 원격 변경사항 도착: 편집 중이 아닌 경우 즉시 화면에 동기화
+        if (saveStatusRef.current === "saved") {
+          setTitle(remoteMemo.title);
+          setContent(remoteMemo.content);
+          setIsPinned(remoteMemo.isPinned);
+          lastSavedRef.current = {
+            title: remoteMemo.title,
+            content: remoteMemo.content,
+          };
+        }
+      },
+      (error) => {
+        console.error("Failed to subscribe memo:", error);
         setInitialLoaded(true);
-        return;
-      }
-
-      const fetched = await fetchMemo(memoId);
-      if (isCancelled) {
-        return;
-      }
-
-      if (fetched) {
-        setTitle(fetched.title);
-        setContent(fetched.content);
-        setIsPinned(fetched.isPinned);
-        lastSavedRef.current = {
-          title: fetched.title,
-          content: fetched.content,
-        };
-      }
-      loadedMemoIdRef.current = memoId;
-      setInitialLoaded(true);
-    }
-
-    loadData();
+      },
+    );
 
     return () => {
-      isCancelled = true;
+      unsubscribe();
     };
-  }, [fetchMemo, getMemoById, memoId]);
+  }, [memoId]);
 
   const saveChanges = useCallback(
     async (newTitle: string, newContent: string) => {
