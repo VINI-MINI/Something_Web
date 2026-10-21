@@ -18,6 +18,7 @@ import {
 } from "@/app/actions/memo";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getIdToken } from "@/services/auth";
+import { subscribeCoupleMemos } from "@/services/memoClient";
 import type { CreateMemoInput, Memo, UpdateMemoInput } from "@/types/memo";
 
 interface MemoContextValue {
@@ -50,10 +51,7 @@ export function MemoProvider({ children }: { children: ReactNode }) {
   const memosRef = useRef<Memo[]>([]);
   memosRef.current = memos;
 
-  const loadMemos = useCallback(async () => {
-    sessionIdRef.current += 1;
-    const sessionId = sessionIdRef.current;
-
+  useEffect(() => {
     if (!user?.coupleId) {
       setMemos([]);
       setLoading(false);
@@ -61,37 +59,22 @@ export function MemoProvider({ children }: { children: ReactNode }) {
     }
 
     setLoading(true);
-    try {
-      const token = await getIdToken();
-      if (sessionId !== sessionIdRef.current) {
-        return;
-      }
-
-      if (token) {
-        const loadedMemos = await getCoupleMemosAction(token);
-        if (sessionId !== sessionIdRef.current) {
-          return;
-        }
-        setMemos(sortMemos(loadedMemos));
-      } else {
-        setMemos([]);
-      }
-    } catch (error) {
-      if (sessionId !== sessionIdRef.current) {
-        return;
-      }
-      console.error("Failed to load couple memos:", error);
-      setMemos([]);
-    } finally {
-      if (sessionId === sessionIdRef.current) {
+    const unsubscribe = subscribeCoupleMemos(
+      user.coupleId,
+      (updatedMemos) => {
+        setMemos(sortMemos(updatedMemos));
         setLoading(false);
-      }
-    }
-  }, [user?.coupleId]);
+      },
+      (error) => {
+        console.error("Failed to subscribe couple memos:", error);
+        setLoading(false);
+      },
+    );
 
-  useEffect(() => {
-    loadMemos();
-  }, [loadMemos]);
+    return () => {
+      unsubscribe();
+    };
+  }, [user?.coupleId]);
 
   const createMemo = useCallback(
     async (input: CreateMemoInput): Promise<Memo> => {
@@ -168,8 +151,17 @@ export function MemoProvider({ children }: { children: ReactNode }) {
   );
 
   const refreshMemos = useCallback(async () => {
-    await loadMemos();
-  }, [loadMemos]);
+    const token = await getIdToken();
+    if (!token) {
+      return;
+    }
+    try {
+      const loaded = await getCoupleMemosAction(token);
+      setMemos(sortMemos(loaded));
+    } catch (error) {
+      console.error("Failed to refresh memos:", error);
+    }
+  }, []);
 
   return (
     <MemoContext.Provider

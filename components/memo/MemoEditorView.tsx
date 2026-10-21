@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMemoContext } from "@/components/memo/MemoProvider";
+import { subscribeMemo } from "@/services/memoClient";
+import type { Memo } from "@/types/memo";
 
 interface MemoEditorViewProps {
   memoId: string;
@@ -12,74 +14,110 @@ type SaveStatus = "saved" | "saving" | "unsaved" | "error";
 
 export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   const router = useRouter();
-  const { deleteMemo, fetchMemo, getMemoById, updateMemo } = useMemoContext();
+  const { deleteMemo, updateMemo } = useMemoContext();
 
   const [initialLoaded, setInitialLoaded] = useState(false);
+  const [memoNotFound, setMemoNotFound] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isPinned, setIsPinned] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [conflictMemo, setConflictMemo] = useState<Memo | null>(null);
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const loadedMemoIdRef = useRef<string | null>(null);
   const saveRevisionRef = useRef(0);
+  const inFlightPromiseRef = useRef<Promise<unknown>>(Promise.resolve());
+  const inFlightSaveRef = useRef<{ title: string; content: string } | null>(
+    null,
+  );
+  const saveStatusRef = useRef<SaveStatus>("saved");
+  saveStatusRef.current = saveStatus;
+
   const lastSavedRef = useRef<{ title: string; content: string }>({
     title: "",
     content: "",
   });
 
   useEffect(() => {
-    // memoId가 바뀌지 않았고 이미 하이드레이션되었다면 재로드를 방지하여 작성 중인 상태를 보존
-    if (loadedMemoIdRef.current === memoId) {
-      return;
-    }
+    const unsubscribe = subscribeMemo(
+      memoId,
+      (remoteMemo) => {
+        if (!remoteMemo) {
+          setMemoNotFound(true);
+          setInitialLoaded(true);
+          return;
+        }
 
-    let isCancelled = false;
+        setMemoNotFound(false);
 
-    async function loadData() {
-      const cached = getMemoById(memoId);
-      if (cached) {
-        setTitle(cached.title);
-        setContent(cached.content);
-        setIsPinned(cached.isPinned);
-        lastSavedRef.current = {
-          title: cached.title,
-          content: cached.content,
-        };
-        loadedMemoIdRef.current = memoId;
+        // 최초 하이드레이션 시점
+        if (loadedMemoIdRef.current !== memoId) {
+          setTitle(remoteMemo.title);
+          setContent(remoteMemo.content);
+          setIsPinned(remoteMemo.isPinned);
+          lastSavedRef.current = {
+            title: remoteMemo.title,
+            content: remoteMemo.content,
+          };
+          loadedMemoIdRef.current = memoId;
+          setInitialLoaded(true);
+          return;
+        }
+
+        // 내 자신의 저장본인지 확인 (이미 저장 완료되었거나 현재 전송 중인 로컬 저장본과 동일한 경우)
+        const isMyCompletedSave =
+          remoteMemo.title === lastSavedRef.current.title &&
+          remoteMemo.content === lastSavedRef.current.content;
+
+        const isMyInFlightSave =
+          inFlightSaveRef.current !== null &&
+          remoteMemo.title === inFlightSaveRef.current.title &&
+          remoteMemo.content === inFlightSaveRef.current.content;
+
+        if (isMyCompletedSave || isMyInFlightSave) {
+          setIsPinned(remoteMemo.isPinned);
+          if (isMyInFlightSave) {
+            lastSavedRef.current = {
+              title: remoteMemo.title,
+              content: remoteMemo.content,
+            };
+          }
+          return;
+        }
+
+        // 상대방의 실제 원격 변경사항 도착:
+        if (saveStatusRef.current === "saved") {
+          // 비편집 상태: 즉시 화면에 자동 동기화
+          setTitle(remoteMemo.title);
+          setContent(remoteMemo.content);
+          setIsPinned(remoteMemo.isPinned);
+          lastSavedRef.current = {
+            title: remoteMemo.title,
+            content: remoteMemo.content,
+          };
+          setConflictMemo(null);
+        } else {
+          // 내가 편집 중(타이핑 또는 다른 내용 저장 진행 중): 사용자 작성 내용 보호를 위해 충돌 감지
+          setConflictMemo(remoteMemo);
+        }
+      },
+      (error) => {
+        console.error("Failed to subscribe memo:", error);
         setInitialLoaded(true);
-        return;
-      }
-
-      const fetched = await fetchMemo(memoId);
-      if (isCancelled) {
-        return;
-      }
-
-      if (fetched) {
-        setTitle(fetched.title);
-        setContent(fetched.content);
-        setIsPinned(fetched.isPinned);
-        lastSavedRef.current = {
-          title: fetched.title,
-          content: fetched.content,
-        };
-      }
-      loadedMemoIdRef.current = memoId;
-      setInitialLoaded(true);
-    }
-
-    loadData();
+      },
+    );
 
     return () => {
-      isCancelled = true;
+      unsubscribe();
     };
-  }, [fetchMemo, getMemoById, memoId]);
+  }, [memoId]);
 
   const saveChanges = useCallback(
     async (newTitle: string, newContent: string) => {
       if (
+        inFlightSaveRef.current === null &&
         newTitle === lastSavedRef.current.title &&
         newContent === lastSavedRef.current.content
       ) {
@@ -89,29 +127,50 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
 
       saveRevisionRef.current += 1;
       const currentRevision = saveRevisionRef.current;
+      inFlightSaveRef.current = { title: newTitle, content: newContent };
 
       setSaveStatus("saving");
       setErrorMessage(null);
-      try {
-        await updateMemo(memoId, {
-          title: newTitle,
-          content: newContent,
-        });
 
+      const previousPromise = inFlightPromiseRef.current;
+      const currentPromise = (async () => {
+        try {
+          await previousPromise;
+        } catch {
+          // 이전 직렬화 저장이 실패했더라도 후속 저장은 계속 진행
+        }
+
+        // 대기 중 새 저장 요청이 들어와 리비전이 증가했으면 취소
         if (currentRevision !== saveRevisionRef.current) {
           return;
         }
 
-        lastSavedRef.current = { title: newTitle, content: newContent };
-        setSaveStatus("saved");
-      } catch (error) {
-        if (currentRevision !== saveRevisionRef.current) {
-          return;
+        try {
+          await updateMemo(memoId, {
+            title: newTitle,
+            content: newContent,
+          });
+
+          if (currentRevision !== saveRevisionRef.current) {
+            return;
+          }
+
+          inFlightSaveRef.current = null;
+          lastSavedRef.current = { title: newTitle, content: newContent };
+          setSaveStatus("saved");
+        } catch (error) {
+          if (currentRevision !== saveRevisionRef.current) {
+            return;
+          }
+          inFlightSaveRef.current = null;
+          console.error("Failed to save memo:", error);
+          setSaveStatus("error");
+          setErrorMessage("저장에 실패했습니다. 다시 시도해 주세요.");
         }
-        console.error("Failed to save memo:", error);
-        setSaveStatus("error");
-        setErrorMessage("저장에 실패했습니다. 다시 시도해 주세요.");
-      }
+      })();
+
+      inFlightPromiseRef.current = currentPromise;
+      await currentPromise;
     },
     [memoId, updateMemo],
   );
@@ -182,6 +241,58 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
     }
   };
 
+  const handleMergeAppend = async () => {
+    if (!conflictMemo) {
+      return;
+    }
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    const remoteContent = conflictMemo.content.trim();
+    const localContent = content.trim();
+
+    let mergedContent = "";
+    if (remoteContent && localContent) {
+      mergedContent = `${remoteContent}\n\n---\n\n${localContent}`;
+    } else {
+      mergedContent = remoteContent || localContent;
+    }
+
+    const mergedTitle = title.trim() || conflictMemo.title;
+
+    setTitle(mergedTitle);
+    setContent(mergedContent);
+    setConflictMemo(null);
+
+    await saveChanges(mergedTitle, mergedContent);
+  };
+
+  const handleAcceptRemote = async () => {
+    if (!conflictMemo) {
+      return;
+    }
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    const remoteTitle = conflictMemo.title;
+    const remoteContent = conflictMemo.content;
+    const remoteIsPinned = conflictMemo.isPinned;
+
+    setTitle(remoteTitle);
+    setContent(remoteContent);
+    setIsPinned(remoteIsPinned);
+    setConflictMemo(null);
+
+    // 진행 중인 이전 저장이 서버에 구버전을 덮어쓰지 않도록, 직렬화 큐를 통해 원격 내용으로 저장
+    await saveChanges(remoteTitle, remoteContent);
+  };
+
+  const handleDismissConflict = () => {
+    setConflictMemo(null);
+  };
+
   if (!initialLoaded) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center p-6">
@@ -192,8 +303,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
     );
   }
 
-  const memoExists = Boolean(getMemoById(memoId));
-  if (!memoExists && initialLoaded) {
+  if (memoNotFound && initialLoaded) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
         <p className="text-sm text-zinc-600 dark:text-zinc-300">
@@ -276,6 +386,57 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
           </button>
         </div>
       </div>
+
+      {/* 동시 편집 충돌 알림 배너 */}
+      {conflictMemo && (
+        <div className="mt-3 flex flex-col gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 font-semibold">
+              <span className="text-base">💡</span>
+              <span>상대방이 새로운 내용을 저장했습니다.</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleDismissConflict}
+              className="rounded p-1 text-amber-600 hover:bg-amber-100 hover:text-amber-900 dark:text-amber-400 dark:hover:bg-amber-900/50"
+              title="알림 닫기"
+              aria-label="알림 닫기"
+            >
+              ✕
+            </button>
+          </div>
+
+          <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-300/90">
+            작성 중인 내용의 유실을 방지하기 위해 자동 덮어쓰기를 멈췄습니다. 내용을 어떻게 반영할까요?
+          </p>
+
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleMergeAppend}
+              className="flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 font-semibold text-white shadow-sm transition hover:bg-amber-700 dark:bg-amber-500 dark:text-zinc-950 dark:hover:bg-amber-400"
+            >
+              <span>🧩 아래에 이어붙여서 합치기 (추천)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleAcceptRemote}
+              className="rounded-lg border border-amber-300 bg-white/80 px-2.5 py-1.5 font-medium text-amber-800 transition hover:bg-white dark:border-amber-800 dark:bg-zinc-900 dark:text-amber-300 dark:hover:bg-zinc-800"
+            >
+              상대방 내용으로 바꾸기
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDismissConflict}
+              className="px-2 py-1.5 text-amber-600 underline hover:text-amber-800 dark:text-amber-400"
+            >
+              내 내용 계속 작성
+            </button>
+          </div>
+        </div>
+      )}
 
       {errorMessage && (
         <div className="mt-2 rounded-xl bg-rose-50 p-2.5 text-xs text-rose-600 dark:bg-rose-950/40 dark:text-rose-400">
