@@ -28,6 +28,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const loadedMemoIdRef = useRef<string | null>(null);
   const saveRevisionRef = useRef(0);
+  const inFlightPromiseRef = useRef<Promise<unknown>>(Promise.resolve());
   const inFlightSaveRef = useRef<{ title: string; content: string } | null>(
     null,
   );
@@ -116,6 +117,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   const saveChanges = useCallback(
     async (newTitle: string, newContent: string) => {
       if (
+        inFlightSaveRef.current === null &&
         newTitle === lastSavedRef.current.title &&
         newContent === lastSavedRef.current.content
       ) {
@@ -129,28 +131,46 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
 
       setSaveStatus("saving");
       setErrorMessage(null);
-      try {
-        await updateMemo(memoId, {
-          title: newTitle,
-          content: newContent,
-        });
 
+      const previousPromise = inFlightPromiseRef.current;
+      const currentPromise = (async () => {
+        try {
+          await previousPromise;
+        } catch {
+          // 이전 직렬화 저장이 실패했더라도 후속 저장은 계속 진행
+        }
+
+        // 대기 중 새 저장 요청이 들어와 리비전이 증가했으면 취소
         if (currentRevision !== saveRevisionRef.current) {
           return;
         }
 
-        inFlightSaveRef.current = null;
-        lastSavedRef.current = { title: newTitle, content: newContent };
-        setSaveStatus("saved");
-      } catch (error) {
-        if (currentRevision !== saveRevisionRef.current) {
-          return;
+        try {
+          await updateMemo(memoId, {
+            title: newTitle,
+            content: newContent,
+          });
+
+          if (currentRevision !== saveRevisionRef.current) {
+            return;
+          }
+
+          inFlightSaveRef.current = null;
+          lastSavedRef.current = { title: newTitle, content: newContent };
+          setSaveStatus("saved");
+        } catch (error) {
+          if (currentRevision !== saveRevisionRef.current) {
+            return;
+          }
+          inFlightSaveRef.current = null;
+          console.error("Failed to save memo:", error);
+          setSaveStatus("error");
+          setErrorMessage("저장에 실패했습니다. 다시 시도해 주세요.");
         }
-        inFlightSaveRef.current = null;
-        console.error("Failed to save memo:", error);
-        setSaveStatus("error");
-        setErrorMessage("저장에 실패했습니다. 다시 시도해 주세요.");
-      }
+      })();
+
+      inFlightPromiseRef.current = currentPromise;
+      await currentPromise;
     },
     [memoId, updateMemo],
   );
@@ -248,7 +268,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
     await saveChanges(mergedTitle, mergedContent);
   };
 
-  const handleAcceptRemote = () => {
+  const handleAcceptRemote = async () => {
     if (!conflictMemo) {
       return;
     }
@@ -256,15 +276,17 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
       clearTimeout(debounceTimerRef.current);
     }
 
-    setTitle(conflictMemo.title);
-    setContent(conflictMemo.content);
-    setIsPinned(conflictMemo.isPinned);
-    lastSavedRef.current = {
-      title: conflictMemo.title,
-      content: conflictMemo.content,
-    };
-    setSaveStatus("saved");
+    const remoteTitle = conflictMemo.title;
+    const remoteContent = conflictMemo.content;
+    const remoteIsPinned = conflictMemo.isPinned;
+
+    setTitle(remoteTitle);
+    setContent(remoteContent);
+    setIsPinned(remoteIsPinned);
     setConflictMemo(null);
+
+    // 진행 중인 이전 저장이 서버에 구버전을 덮어쓰지 않도록, 직렬화 큐를 통해 원격 내용으로 저장
+    await saveChanges(remoteTitle, remoteContent);
   };
 
   const handleDismissConflict = () => {
@@ -378,6 +400,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
               onClick={handleDismissConflict}
               className="rounded p-1 text-amber-600 hover:bg-amber-100 hover:text-amber-900 dark:text-amber-400 dark:hover:bg-amber-900/50"
               title="알림 닫기"
+              aria-label="알림 닫기"
             >
               ✕
             </button>
