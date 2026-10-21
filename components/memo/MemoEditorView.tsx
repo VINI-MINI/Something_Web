@@ -14,9 +14,10 @@ type SaveStatus = "saved" | "saving" | "unsaved" | "error";
 
 export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   const router = useRouter();
-  const { deleteMemo, getMemoById, updateMemo } = useMemoContext();
+  const { deleteMemo, updateMemo } = useMemoContext();
 
   const [initialLoaded, setInitialLoaded] = useState(false);
+  const [memoNotFound, setMemoNotFound] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isPinned, setIsPinned] = useState(false);
@@ -40,9 +41,12 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
       memoId,
       (remoteMemo) => {
         if (!remoteMemo) {
+          setMemoNotFound(true);
           setInitialLoaded(true);
           return;
         }
+
+        setMemoNotFound(false);
 
         // 최초 하이드레이션 시점
         if (loadedMemoIdRef.current !== memoId) {
@@ -260,8 +264,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
     );
   }
 
-  const memoExists = Boolean(getMemoById(memoId));
-  if (!memoExists && initialLoaded) {
+  if (memoNotFound && initialLoaded) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
         <p className="text-sm text-zinc-600 dark:text-zinc-300">
