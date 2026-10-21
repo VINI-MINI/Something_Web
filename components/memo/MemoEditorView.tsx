@@ -28,6 +28,9 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const loadedMemoIdRef = useRef<string | null>(null);
   const saveRevisionRef = useRef(0);
+  const inFlightSaveRef = useRef<{ title: string; content: string } | null>(
+    null,
+  );
   const saveStatusRef = useRef<SaveStatus>("saved");
   saveStatusRef.current = saveStatus;
 
@@ -62,17 +65,28 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
           return;
         }
 
-        // 원격 내용 변경 여부 확인
-        const isContentDifferent =
-          remoteMemo.title !== lastSavedRef.current.title ||
-          remoteMemo.content !== lastSavedRef.current.content;
+        // 내 자신의 저장본인지 확인 (이미 저장 완료되었거나 현재 전송 중인 로컬 저장본과 동일한 경우)
+        const isMyCompletedSave =
+          remoteMemo.title === lastSavedRef.current.title &&
+          remoteMemo.content === lastSavedRef.current.content;
 
-        if (!isContentDifferent) {
+        const isMyInFlightSave =
+          inFlightSaveRef.current !== null &&
+          remoteMemo.title === inFlightSaveRef.current.title &&
+          remoteMemo.content === inFlightSaveRef.current.content;
+
+        if (isMyCompletedSave || isMyInFlightSave) {
           setIsPinned(remoteMemo.isPinned);
+          if (isMyInFlightSave) {
+            lastSavedRef.current = {
+              title: remoteMemo.title,
+              content: remoteMemo.content,
+            };
+          }
           return;
         }
 
-        // 실시간 원격 변경사항 도착:
+        // 상대방의 실제 원격 변경사항 도착:
         if (saveStatusRef.current === "saved") {
           // 비편집 상태: 즉시 화면에 자동 동기화
           setTitle(remoteMemo.title);
@@ -84,7 +98,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
           };
           setConflictMemo(null);
         } else {
-          // 내가 편집 중(타이핑 또는 저장 진행 중): 사용자 작성 내용 보호를 위해 충돌 감지
+          // 내가 편집 중(타이핑 또는 다른 내용 저장 진행 중): 사용자 작성 내용 보호를 위해 충돌 감지
           setConflictMemo(remoteMemo);
         }
       },
@@ -111,6 +125,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
 
       saveRevisionRef.current += 1;
       const currentRevision = saveRevisionRef.current;
+      inFlightSaveRef.current = { title: newTitle, content: newContent };
 
       setSaveStatus("saving");
       setErrorMessage(null);
@@ -124,12 +139,14 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
           return;
         }
 
+        inFlightSaveRef.current = null;
         lastSavedRef.current = { title: newTitle, content: newContent };
         setSaveStatus("saved");
       } catch (error) {
         if (currentRevision !== saveRevisionRef.current) {
           return;
         }
+        inFlightSaveRef.current = null;
         console.error("Failed to save memo:", error);
         setSaveStatus("error");
         setErrorMessage("저장에 실패했습니다. 다시 시도해 주세요.");
