@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { MemoBlockEditor } from "@/components/memo/MemoBlockEditor";
 import { MemoBlockList } from "@/components/memo/MemoBlockList";
 import { useMemoContext } from "@/components/memo/MemoProvider";
 import {
@@ -16,6 +17,7 @@ interface MemoEditorViewProps {
   memoId: string;
 }
 
+type EditSubMode = "block" | "raw";
 type SaveStatus = "saved" | "saving" | "unsaved" | "error";
 
 export function MemoEditorView({ memoId }: MemoEditorViewProps) {
@@ -26,6 +28,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [memoNotFound, setMemoNotFound] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [editSubMode, setEditSubMode] = useState<EditSubMode>("block");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isPinned, setIsPinned] = useState(false);
@@ -527,13 +530,53 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
             className="w-full bg-transparent text-xl font-bold tracking-tight text-zinc-900 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-50 dark:placeholder:text-zinc-600"
           />
 
-          <textarea
-            value={content}
-            onChange={handleContentChange}
-            onBlur={handleBlur}
-            placeholder="자유롭게 마크다운 메모를 적어보세요... (- [ ] 체크박스, # 제목, - 목록 등)"
-            className="min-h-[60vh] w-full flex-1 resize-none bg-transparent text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-600"
-          />
+          {/* 편집 서브 모드 전환 탭 (블록 편집 vs 마크다운) */}
+          <div className="flex items-center justify-between border-b border-zinc-100 pb-2 dark:border-zinc-800">
+            <div className="flex items-center gap-1 rounded-lg bg-zinc-100 p-0.5 text-xs dark:bg-zinc-800">
+              <button
+                type="button"
+                onClick={() => setEditSubMode("block")}
+                className={`rounded-md px-2.5 py-1 font-medium transition ${
+                  editSubMode === "block"
+                    ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-100"
+                    : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                }`}
+              >
+                블록 편집
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditSubMode("raw")}
+                className={`rounded-md px-2.5 py-1 font-medium transition ${
+                  editSubMode === "raw"
+                    ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-100"
+                    : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                }`}
+              >
+                마크다운
+              </button>
+            </div>
+            <span className="text-[11px] text-zinc-400 dark:text-zinc-500">
+              {editSubMode === "block"
+                ? "노션 스타일 블록 편집"
+                : "원본 마크다운 직접 입력"}
+            </span>
+          </div>
+
+          {editSubMode === "block" ? (
+            <MemoBlockEditor
+              blocks={blocks}
+              onBlur={handleBlur}
+            />
+          ) : (
+            <textarea
+              value={content}
+              onChange={handleContentChange}
+              onBlur={handleBlur}
+              placeholder="자유롭게 마크다운 메모를 적어보세요... (- [ ] 체크박스, # 제목, - 목록 등)"
+              className="min-h-[60vh] w-full flex-1 resize-none bg-transparent text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-600"
+            />
+          )}
         </div>
       ) : (
         <div className="mt-4 flex flex-1 flex-col gap-3">
