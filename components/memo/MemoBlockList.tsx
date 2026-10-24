@@ -1,5 +1,6 @@
 "use client";
 
+import { InlineMarkdownText } from "@/components/memo/InlineMarkdownText";
 import type { MarkdownBlock } from "@/types/markdown";
 
 interface MemoBlockItemProps {
@@ -49,7 +50,11 @@ export function MemoBlockItem({
                 : "text-zinc-800 dark:text-zinc-200"
             }`}
           >
-            {block.content || <span className="opacity-40">빈 체크 항목</span>}
+            {block.content ? (
+              <InlineMarkdownText text={block.content} />
+            ) : (
+              <span className="opacity-40">빈 체크 항목</span>
+            )}
           </span>
         </div>
       );
@@ -59,20 +64,32 @@ export function MemoBlockItem({
       if (block.level === 1) {
         return (
           <h1 className="mt-3.5 mb-1.5 text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            {block.content || "\u00A0"}
+            {block.content ? (
+              <InlineMarkdownText text={block.content} />
+            ) : (
+              "\u00A0"
+            )}
           </h1>
         );
       }
       if (block.level === 2) {
         return (
           <h2 className="mt-3 mb-1 text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-            {block.content || "\u00A0"}
+            {block.content ? (
+              <InlineMarkdownText text={block.content} />
+            ) : (
+              "\u00A0"
+            )}
           </h2>
         );
       }
       return (
         <h3 className="mt-2.5 mb-1 text-base font-semibold text-zinc-800 dark:text-zinc-200">
-          {block.content || "\u00A0"}
+          {block.content ? (
+            <InlineMarkdownText text={block.content} />
+          ) : (
+            "\u00A0"
+          )}
         </h3>
       );
     }
@@ -81,7 +98,13 @@ export function MemoBlockItem({
       return (
         <div className="flex items-start gap-2.5 py-0.5 pl-1 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
           <span className="select-none text-zinc-400 dark:text-zinc-500">•</span>
-          <span className="flex-1">{block.content || "\u00A0"}</span>
+          <span className="flex-1">
+            {block.content ? (
+              <InlineMarkdownText text={block.content} />
+            ) : (
+              "\u00A0"
+            )}
+          </span>
         </div>
       );
 
@@ -91,7 +114,13 @@ export function MemoBlockItem({
           <span className="min-w-[1.25rem] select-none text-xs font-semibold tabular-nums text-zinc-400 dark:text-zinc-500">
             {block.number}.
           </span>
-          <span className="flex-1">{block.content || "\u00A0"}</span>
+          <span className="flex-1">
+            {block.content ? (
+              <InlineMarkdownText text={block.content} />
+            ) : (
+              "\u00A0"
+            )}
+          </span>
         </div>
       );
 
@@ -107,7 +136,7 @@ export function MemoBlockItem({
       }
       return (
         <p className="min-h-[1.5rem] py-0.5 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
-          {block.content}
+          <InlineMarkdownText text={block.content} />
         </p>
       );
   }
