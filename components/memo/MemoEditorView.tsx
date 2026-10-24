@@ -253,6 +253,11 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
     triggerDebouncedSave(title, val);
   };
 
+  const handleBlockContentChange = (newContent: string) => {
+    setContent(newContent);
+    triggerDebouncedSave(title, newContent);
+  };
+
   const handleManualSave = async () => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -566,6 +571,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
           {editSubMode === "block" ? (
             <MemoBlockEditor
               blocks={blocks}
+              onChangeContent={handleBlockContentChange}
               onBlur={handleBlur}
             />
           ) : (
