@@ -1,5 +1,10 @@
 pipeline {
     agent any
+
+    parameters {
+        string(name: 'ENV_CREDENTIAL_ID', defaultValue: '', description: 'Credential ID for the .env file')
+    }
+
     environment {
         GIT_MESSAGE = sh(returnStdout: true, script: "git log -n 1 --format=%s ${GIT_COMMIT}").trim()
         GIT_AUTHOR = sh(returnStdout: true, script: "git log -n 1 --format=%ae ${GIT_COMMIT}").trim()
@@ -13,11 +18,24 @@ pipeline {
     }
 
     stages {
+        stage('Prepare Environment') {
+            steps {
+                script {
+                    if (params.ENV_CREDENTIAL_ID) {
+                        withCredentials([file(credentialsId: params.ENV_CREDENTIAL_ID, variable: 'ENV_FILE')]) {
+                            sh 'cp $ENV_FILE ./.env.local'
+                            echo 'ENV File copied.'
+                        }
+                    } else {
+                        echo 'No .env credential ID provided. Skipping injection.'
+                    }
+                }
+            }
+        }
+
         stage("Build Docker Image") {
             steps {
                 script {
-                    // NEXT_PUBLIC_* 환경변수는 Jenkins의 Secret Text / Credentials로 등록하거나,
-                    // 빌드 시 withCredentials 블록을 통해 --build-arg로 전달할 수 있습니다.
                     docker.build(
                         "${DOCKER_IMAGE_STORAGE}/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}",
                         "-f Dockerfile ."
@@ -41,6 +59,7 @@ pipeline {
 
     post {
         always {
+            sh 'rm -f .env.local'
             UsefulNotifier(currentBuild.currentResult)
         }
     }
