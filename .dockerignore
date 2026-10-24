@@ -9,7 +9,6 @@ dist
 build
 
 # Environment files
-.env*.local
 .env
 
 # Debug and system files
