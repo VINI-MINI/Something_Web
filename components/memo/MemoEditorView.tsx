@@ -59,6 +59,17 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
     }
 
     if (!user) {
+      setTitle("");
+      setContent("");
+      setIsPinned(false);
+      setConflictMemo(null);
+      setErrorMessage(null);
+      loadedMemoIdRef.current = null;
+      lastSavedRef.current = { title: "", content: "" };
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
       setInitialLoaded(true);
       return;
     }
@@ -351,6 +362,11 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
 
   const handleToggleCheckbox = useCallback(
     async (lineIndex: number) => {
+      // 대기 중인 이전 디바운스 저장이 체크박스 변경사항을 덮어쓰지 않도록 즉시 취소
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
       const nextContent = toggleCheckboxAtLine(content, lineIndex);
       setContent(nextContent);
       await saveChanges(title, nextContent);
@@ -364,6 +380,23 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           메모를 불러오는 중...
         </p>
+      </main>
+    );
+  }
+
+  if (!user && !authLoading) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+        <p className="text-sm text-zinc-600 dark:text-zinc-300">
+          로그인이 필요합니다.
+        </p>
+        <button
+          type="button"
+          onClick={() => router.push("/login")}
+          className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        >
+          로그인하러 가기
+        </button>
       </main>
     );
   }
