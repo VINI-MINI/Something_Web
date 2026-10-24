@@ -49,16 +49,25 @@ export function MemoProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const sessionIdRef = useRef(0);
   const memosRef = useRef<Memo[]>([]);
-  memosRef.current = memos;
+
+  useEffect(() => {
+    memosRef.current = memos;
+  }, [memos]);
+
+  const [prevCoupleId, setPrevCoupleId] = useState(user?.coupleId);
+  if (user?.coupleId !== prevCoupleId) {
+    setPrevCoupleId(user?.coupleId);
+    setLoading(Boolean(user?.coupleId));
+    if (!user?.coupleId) {
+      setMemos([]);
+    }
+  }
 
   useEffect(() => {
     if (!user?.coupleId) {
-      setMemos([]);
-      setLoading(false);
       return;
     }
 
-    setLoading(true);
     const unsubscribe = subscribeCoupleMemos(
       user.coupleId,
       (updatedMemos) => {

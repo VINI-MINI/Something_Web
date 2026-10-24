@@ -44,7 +44,10 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
     null,
   );
   const saveStatusRef = useRef<SaveStatus>("saved");
-  saveStatusRef.current = saveStatus;
+
+  useEffect(() => {
+    saveStatusRef.current = saveStatus;
+  }, [saveStatus]);
 
   const lastSavedRef = useRef<{ title: string; content: string }>({
     title: "",
@@ -54,23 +57,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   const blocks = useMemo(() => parseMarkdownToBlocks(content), [content]);
 
   useEffect(() => {
-    if (authLoading) {
-      return;
-    }
-
-    if (!user) {
-      setTitle("");
-      setContent("");
-      setIsPinned(false);
-      setConflictMemo(null);
-      setErrorMessage(null);
-      loadedMemoIdRef.current = null;
-      lastSavedRef.current = { title: "", content: "" };
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
-      }
-      setInitialLoaded(true);
+    if (authLoading || !user) {
       return;
     }
 

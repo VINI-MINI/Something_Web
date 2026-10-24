@@ -1,13 +1,4 @@
-import type {
-  BulletListBlock,
-  CheckboxBlock,
-  DividerBlock,
-  HeadingBlock,
-  MarkdownBlock,
-  MarkdownBlockType,
-  NumberedListBlock,
-  TextBlock,
-} from "@/types/markdown";
+import type { CheckboxBlock, MarkdownBlock } from "@/types/markdown";
 
 let blockCounter = 0;
 
