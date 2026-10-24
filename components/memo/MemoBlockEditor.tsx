@@ -352,7 +352,7 @@ export function MemoBlockEditor({
                     onChange={(val) => handleUpdateBlockContent(index, val)}
                     onKeyDown={(e) => handleKeyDown(index, block, e)}
                     onBlur={handleInputBlur}
-                    placeholder="체크리스트 항목 입력..."
+                    placeholder=""
                     autoFocus
                     cursorPos={cursorPos}
                     className={`flex-1 text-sm leading-relaxed ${
@@ -376,7 +376,7 @@ export function MemoBlockEditor({
                     {block.content ? (
                       <InlineMarkdownText text={block.content} />
                     ) : (
-                      <span className="opacity-40">체크리스트 항목 입력...</span>
+                      "\u00A0"
                     )}
                   </div>
                 )}
@@ -407,7 +407,7 @@ export function MemoBlockEditor({
                     onChange={(val) => handleUpdateBlockContent(index, val)}
                     onKeyDown={(e) => handleKeyDown(index, block, e)}
                     onBlur={handleInputBlur}
-                    placeholder={`제목 (H${block.level}) 입력...`}
+                    placeholder=""
                     autoFocus
                     cursorPos={cursorPos}
                     className={`w-full ${headingClass}`}
@@ -423,9 +423,7 @@ export function MemoBlockEditor({
                     {block.content ? (
                       <InlineMarkdownText text={block.content} />
                     ) : (
-                      <span className="opacity-30">
-                        제목 (H{block.level}) 입력...
-                      </span>
+                      "\u00A0"
                     )}
                   </div>
                 )}
@@ -448,7 +446,7 @@ export function MemoBlockEditor({
                     onChange={(val) => handleUpdateBlockContent(index, val)}
                     onKeyDown={(e) => handleKeyDown(index, block, e)}
                     onBlur={handleInputBlur}
-                    placeholder="목록 항목 입력..."
+                    placeholder=""
                     autoFocus
                     cursorPos={cursorPos}
                     className="flex-1 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200"
@@ -464,7 +462,7 @@ export function MemoBlockEditor({
                     {block.content ? (
                       <InlineMarkdownText text={block.content} />
                     ) : (
-                      <span className="opacity-30">목록 항목 입력...</span>
+                      "\u00A0"
                     )}
                   </div>
                 )}
@@ -487,7 +485,7 @@ export function MemoBlockEditor({
                     onChange={(val) => handleUpdateBlockContent(index, val)}
                     onKeyDown={(e) => handleKeyDown(index, block, e)}
                     onBlur={handleInputBlur}
-                    placeholder="번호 목록 항목 입력..."
+                    placeholder=""
                     autoFocus
                     cursorPos={cursorPos}
                     className="flex-1 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200"
@@ -503,9 +501,7 @@ export function MemoBlockEditor({
                     {block.content ? (
                       <InlineMarkdownText text={block.content} />
                     ) : (
-                      <span className="opacity-30">
-                        번호 목록 항목 입력...
-                      </span>
+                      "\u00A0"
                     )}
                   </div>
                 )}
@@ -531,7 +527,7 @@ export function MemoBlockEditor({
                     onChange={(val) => handleUpdateBlockContent(index, val)}
                     onKeyDown={(e) => handleKeyDown(index, block, e)}
                     onBlur={handleInputBlur}
-                    placeholder="내용을 입력하세요..."
+                    placeholder=""
                     autoFocus
                     cursorPos={cursorPos}
                     className="min-h-[1.5rem] w-full text-sm leading-relaxed text-zinc-800 dark:text-zinc-200"
@@ -547,7 +543,7 @@ export function MemoBlockEditor({
                     {block.content ? (
                       <InlineMarkdownText text={block.content} />
                     ) : (
-                      <span className="opacity-30">내용을 입력하세요...</span>
+                      "\u00A0"
                     )}
                   </div>
                 )}
