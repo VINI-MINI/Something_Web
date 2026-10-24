@@ -10,7 +10,7 @@ import { MemoListView } from "@/components/memo/MemoListView";
 
 export default function Home() {
   const { loading: authLoading, signOut, user } = useAuth();
-  const { couple, loading: coupleLoading, partner } = useCouple();
+  const { partner } = useCouple();
 
   if (authLoading) {
     return (

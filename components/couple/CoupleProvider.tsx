@@ -45,13 +45,13 @@ export function CoupleProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    const token = await getIdToken();
+    if (!token) {
+      return;
+    }
+
     setLoading(true);
     try {
-      const token = await getIdToken();
-      if (!token) {
-        return;
-      }
-
       if (user.coupleId) {
         const { couple: loadedCouple, partner: loadedPartner } =
           await getCoupleDataAction(token);
@@ -72,8 +72,54 @@ export function CoupleProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    void loadCoupleData();
-  }, [loadCoupleData]);
+    let ignore = false;
+
+    if (!user) {
+      return;
+    }
+
+    const fetchInitialData = async () => {
+      const token = await getIdToken();
+      if (!token || ignore) {
+        return;
+      }
+
+      setLoading(true);
+      try {
+        if (user.coupleId) {
+          const { couple: loadedCouple, partner: loadedPartner } =
+            await getCoupleDataAction(token);
+          if (!ignore) {
+            setCouple(loadedCouple);
+            setPartner(loadedPartner);
+            setActiveInvite(null);
+          }
+        } else {
+          const invite = await getActiveInviteCodeAction(token);
+          if (!ignore) {
+            setActiveInvite(invite);
+            setCouple(null);
+            setPartner(null);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load couple data:", error);
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void fetchInitialData();
+
+    return () => {
+      ignore = true;
+      setCouple(null);
+      setPartner(null);
+      setActiveInvite(null);
+    };
+  }, [user]);
 
   const handleCreateInvite = useCallback(async (): Promise<InviteCode> => {
     setLoading(true);

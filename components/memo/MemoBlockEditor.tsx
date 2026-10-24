@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { InlineMarkdownText } from "@/components/memo/InlineMarkdownText";
 import {
+  generateBlockId,
   stringifyBlocksToMarkdown,
   toggleCheckboxBlock,
 } from "@/services/markdownBlock";
-import type { MarkdownBlock, NumberedListBlock } from "@/types/markdown";
+import type { MarkdownBlock } from "@/types/markdown";
 
 interface AutoResizeTextareaProps {
   value: string;
@@ -120,13 +121,17 @@ export function MemoBlockEditor({
             content: line,
           };
         }
+        if (targetBlock.type === "checkbox") {
+          return {
+            id: generateBlockId(),
+            type: "checkbox" as const,
+            checked: false,
+            content: line,
+          };
+        }
         return {
-          id: `b_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          type:
-            targetBlock.type === "checkbox"
-              ? ("checkbox" as const)
-              : ("text" as const),
-          ...(targetBlock.type === "checkbox" ? { checked: false } : {}),
+          id: generateBlockId(),
+          type: "text" as const,
           content: line,
         };
       });
@@ -288,6 +293,10 @@ export function MemoBlockEditor({
         return;
       }
 
+      if (block.type === "divider") {
+        return;
+      }
+
       // 1-2. 커서 위치 기준 텍스트 분할
       const leftText = value.slice(0, selectionStart);
       const rightText = value.slice(selectionEnd);
@@ -300,7 +309,7 @@ export function MemoBlockEditor({
 
       // 다음 줄에 삽입할 새 블록 결정
       let newBlock: MarkdownBlock;
-      const newBlockId = `b_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const newBlockId = generateBlockId();
 
       if (block.type === "checkbox") {
         newBlock = {
@@ -338,7 +347,10 @@ export function MemoBlockEditor({
         for (let i = index + 2; i < nextBlocks.length; i++) {
           const item = nextBlocks[i];
           if (item && item.type === "numberedList") {
-            (nextBlocks[i] as NumberedListBlock).number += 1;
+            nextBlocks[i] = {
+              ...item,
+              number: item.number + 1,
+            };
           } else {
             break;
           }

@@ -1,24 +1,19 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useCouple } from "@/components/couple/CoupleProvider";
 
 export function CoupleConnectView() {
   const searchParams = useSearchParams();
   const { acceptInvite, activeInvite, createInvite, loading } = useCouple();
 
-  const [inputCode, setInputCode] = useState("");
+  const [inputCode, setInputCode] = useState(
+    () => searchParams.get("code")?.trim().toUpperCase() ?? "",
+  );
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    const codeParam = searchParams.get("code");
-    if (codeParam) {
-      setInputCode(codeParam.trim().toUpperCase());
-    }
-  }, [searchParams]);
 
   const handleCreateCode = async () => {
     setErrorMessage(null);
