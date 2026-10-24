@@ -110,6 +110,33 @@ export function MemoBlockEditor({
       return;
     }
 
+    // 개행 문자가 포함되어 있는 경우 (붙여넣기 등) 안전하게 블록 단위 분할
+    if (newContent.includes("\n")) {
+      const lines = newContent.replace(/\r\n/g, "\n").split("\n");
+      const insertedBlocks = lines.map((line, offset) => {
+        if (offset === 0) {
+          return {
+            ...targetBlock,
+            content: line,
+          };
+        }
+        return {
+          id: `b_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          type:
+            targetBlock.type === "checkbox"
+              ? ("checkbox" as const)
+              : ("text" as const),
+          ...(targetBlock.type === "checkbox" ? { checked: false } : {}),
+          content: line,
+        };
+      });
+
+      nextBlocks.splice(index, 1, ...insertedBlocks);
+      const nextMarkdown = stringifyBlocksToMarkdown(nextBlocks);
+      onChangeContent?.(nextMarkdown);
+      return;
+    }
+
     nextBlocks[index] = {
       ...targetBlock,
       content: newContent,
@@ -237,8 +264,8 @@ export function MemoBlockEditor({
     const target = e.currentTarget;
     const { selectionStart, selectionEnd, value } = target;
 
-    // 1. Enter 키 처리 (새 줄 생성, 목록 연속, 목록 탈출)
-    if (e.key === "Enter" && !e.shiftKey) {
+    // 1. Enter 키 처리 (Shift+Enter 포함: 단일 블록 내 줄바꿈 삽입으로 인한 구조 왜곡 방지)
+    if (e.key === "Enter") {
       e.preventDefault();
 
       // 1-1. 내용이 없는 빈 체크박스 / 리스트에서 엔터 -> 목록 탈출 (일반 텍스트 줄로 변환)
