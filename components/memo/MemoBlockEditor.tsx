@@ -134,6 +134,96 @@ export function MemoBlockEditor({
     onBlur?.();
   };
 
+  const handleTransformBlock = (
+    targetType:
+      | "checkbox"
+      | "bulletList"
+      | "numberedList"
+      | "heading"
+      | "text"
+      | "divider",
+  ) => {
+    const index = focusedIndex ?? effectiveBlocks.length - 1;
+    if (index < 0 || index >= effectiveBlocks.length) {
+      return;
+    }
+
+    const currentBlock = effectiveBlocks[index];
+    const nextBlocks = [...effectiveBlocks];
+    const content = currentBlock.type === "divider" ? "" : currentBlock.content;
+
+    if (targetType === "checkbox") {
+      if (currentBlock.type === "checkbox") {
+        nextBlocks[index] = toggleCheckboxBlock(currentBlock);
+      } else {
+        nextBlocks[index] = {
+          id: currentBlock.id,
+          type: "checkbox",
+          checked: false,
+          content,
+        };
+      }
+    } else if (targetType === "heading") {
+      if (currentBlock.type === "heading") {
+        const nextLevel = (currentBlock.level === 3 ? 1 : currentBlock.level + 1) as
+          | 1
+          | 2
+          | 3;
+        nextBlocks[index] = {
+          id: currentBlock.id,
+          type: "heading",
+          level: nextLevel,
+          content,
+        };
+      } else {
+        nextBlocks[index] = {
+          id: currentBlock.id,
+          type: "heading",
+          level: 1,
+          content,
+        };
+      }
+    } else if (targetType === "bulletList") {
+      nextBlocks[index] = {
+        id: currentBlock.id,
+        type: "bulletList",
+        content,
+      };
+    } else if (targetType === "numberedList") {
+      nextBlocks[index] = {
+        id: currentBlock.id,
+        type: "numberedList",
+        number: 1,
+        content,
+      };
+    } else if (targetType === "text") {
+      nextBlocks[index] = {
+        id: currentBlock.id,
+        type: "text",
+        content,
+      };
+    } else if (targetType === "divider") {
+      const dividerId = `b_${Date.now()}_div`;
+      const nextTextId = `b_${Date.now()}_txt`;
+      nextBlocks.splice(
+        index + 1,
+        0,
+        { id: dividerId, type: "divider" },
+        { id: nextTextId, type: "text", content: "" },
+      );
+      setFocusedIndex(index + 2);
+      setCursorPos("start");
+      const nextMarkdown = stringifyBlocksToMarkdown(nextBlocks);
+      onChangeContent?.(nextMarkdown);
+      return;
+    }
+
+    const nextMarkdown = stringifyBlocksToMarkdown(nextBlocks);
+    onChangeContent?.(nextMarkdown);
+    setFocusedIndex(index);
+    setCursorPos("end");
+  };
+
   const handleKeyDown = (
     index: number,
     block: MarkdownBlock,
@@ -317,6 +407,9 @@ export function MemoBlockEditor({
       }
     }
   };
+
+  const activeBlock =
+    focusedIndex !== null ? effectiveBlocks[focusedIndex] : null;
 
   return (
     <div className="flex flex-1 flex-col py-1">
@@ -552,6 +645,104 @@ export function MemoBlockEditor({
           }
         }
       })}
+
+      {/* 하단 퀵 서식 툴바 (모바일 & PC 공통 지원) */}
+      <div className="sticky bottom-4 z-20 mt-6 flex justify-center">
+        <div className="flex items-center gap-1 rounded-2xl border border-zinc-200/90 bg-white/95 p-1.5 shadow-lg backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95">
+          {/* 체크박스 */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleTransformBlock("checkbox")}
+            title="체크리스트로 변환"
+            className={`flex h-8 items-center gap-1 rounded-xl px-2.5 text-xs font-medium transition ${
+              activeBlock?.type === "checkbox"
+                ? "bg-emerald-600 text-white dark:bg-emerald-500"
+                : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            }`}
+          >
+            <span>✓</span>
+            <span>체크</span>
+          </button>
+
+          {/* 제목 (H1/H2/H3 순환) */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleTransformBlock("heading")}
+            title="제목으로 변환 (H1/H2/H3)"
+            className={`flex h-8 items-center gap-1 rounded-xl px-2.5 text-xs font-medium transition ${
+              activeBlock?.type === "heading"
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-semibold"
+                : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            }`}
+          >
+            <span>
+              {activeBlock?.type === "heading" ? `H${activeBlock.level}` : "H"}
+            </span>
+            <span>제목</span>
+          </button>
+
+          {/* 불릿 목록 */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleTransformBlock("bulletList")}
+            title="글머리 기호 목록으로 변환"
+            className={`flex h-8 items-center gap-1 rounded-xl px-2.5 text-xs font-medium transition ${
+              activeBlock?.type === "bulletList"
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-semibold"
+                : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            }`}
+          >
+            <span>•</span>
+            <span>목록</span>
+          </button>
+
+          {/* 번호 목록 */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleTransformBlock("numberedList")}
+            title="번호 매기기 목록으로 변환"
+            className={`flex h-8 items-center gap-1 rounded-xl px-2.5 text-xs font-medium transition ${
+              activeBlock?.type === "numberedList"
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-semibold"
+                : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            }`}
+          >
+            <span>1.</span>
+            <span>번호</span>
+          </button>
+
+          {/* 일반 본문 */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleTransformBlock("text")}
+            title="일반 본문으로 변환"
+            className={`flex h-8 items-center gap-1 rounded-xl px-2.5 text-xs font-medium transition ${
+              activeBlock?.type === "text"
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-semibold"
+                : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            }`}
+          >
+            <span>T</span>
+            <span>본문</span>
+          </button>
+
+          {/* 구분선 삽입 */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleTransformBlock("divider")}
+            title="구분선 삽입"
+            className="flex h-8 items-center gap-1 rounded-xl px-2 text-xs font-medium text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            <span>―</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
