@@ -1,8 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { MemoBlockList } from "@/components/memo/MemoBlockList";
 import { useMemoContext } from "@/components/memo/MemoProvider";
+import {
+  parseMarkdownToBlocks,
+  toggleCheckboxAtLine,
+} from "@/services/markdownBlock";
 import { subscribeMemo } from "@/services/memoClient";
 import type { Memo } from "@/types/memo";
 
@@ -14,10 +20,12 @@ type SaveStatus = "saved" | "saving" | "unsaved" | "error";
 
 export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   const router = useRouter();
-  const { deleteMemo, updateMemo } = useMemoContext();
+  const { user, loading: authLoading } = useAuth();
+  const { deleteMemo, fetchMemo, updateMemo } = useMemoContext();
 
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [memoNotFound, setMemoNotFound] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isPinned, setIsPinned] = useState(false);
@@ -40,7 +48,18 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
     content: "",
   });
 
+  const blocks = useMemo(() => parseMarkdownToBlocks(content), [content]);
+
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
+    if (!user) {
+      setInitialLoaded(true);
+      return;
+    }
+
     const unsubscribe = subscribeMemo(
       memoId,
       (remoteMemo) => {
@@ -62,6 +81,10 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
             content: remoteMemo.content,
           };
           loadedMemoIdRef.current = memoId;
+          // 신규 빈 메모일 경우 바로 작성할 수 있도록 편집 모드로 시작
+          if (!remoteMemo.title && !remoteMemo.content) {
+            setIsEditing(true);
+          }
           setInitialLoaded(true);
           return;
         }
@@ -103,16 +126,41 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
           setConflictMemo(remoteMemo);
         }
       },
-      (error) => {
-        console.error("Failed to subscribe memo:", error);
-        setInitialLoaded(true);
+      async (error) => {
+        console.error("Failed to subscribe memo, falling back to server fetch:", error);
+        try {
+          const fallbackMemo = await fetchMemo(memoId);
+          if (!fallbackMemo) {
+            setMemoNotFound(true);
+          } else {
+            setMemoNotFound(false);
+            if (loadedMemoIdRef.current !== memoId) {
+              setTitle(fallbackMemo.title);
+              setContent(fallbackMemo.content);
+              setIsPinned(fallbackMemo.isPinned);
+              lastSavedRef.current = {
+                title: fallbackMemo.title,
+                content: fallbackMemo.content,
+              };
+              loadedMemoIdRef.current = memoId;
+              if (!fallbackMemo.title && !fallbackMemo.content) {
+                setIsEditing(true);
+              }
+            }
+          }
+        } catch (fetchErr) {
+          console.error("Fallback fetch also failed:", fetchErr);
+          setMemoNotFound(true);
+        } finally {
+          setInitialLoaded(true);
+        }
       },
     );
 
     return () => {
       unsubscribe();
     };
-  }, [memoId]);
+  }, [authLoading, fetchMemo, memoId, user]);
 
   const saveChanges = useCallback(
     async (newTitle: string, newContent: string) => {
@@ -293,7 +341,16 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
     setConflictMemo(null);
   };
 
-  if (!initialLoaded) {
+  const handleToggleCheckbox = useCallback(
+    async (lineIndex: number) => {
+      const nextContent = toggleCheckboxAtLine(content, lineIndex);
+      setContent(nextContent);
+      await saveChanges(title, nextContent);
+    },
+    [content, saveChanges, title],
+  );
+
+  if (authLoading || !initialLoaded) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center p-6">
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -351,6 +408,20 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
               <span className="text-rose-500 font-medium">저장 실패</span>
             )}
           </div>
+
+          {/* 편집 / 완료 토글 버튼 */}
+          <button
+            type="button"
+            onClick={() => setIsEditing((prev) => !prev)}
+            className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow-sm transition ${
+              isEditing
+                ? "bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+                : "bg-zinc-100 text-zinc-800 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+            }`}
+          >
+            <span>{isEditing ? "✓" : "✏️"}</span>
+            <span>{isEditing ? "완료" : "편집"}</span>
+          </button>
 
           {/* 수동 동기화(저장) 버튼 */}
           <button
@@ -444,25 +515,49 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
         </div>
       )}
 
-      {/* 에디터 폼 */}
-      <div className="mt-4 flex flex-1 flex-col gap-3">
-        <input
-          type="text"
-          value={title}
-          onChange={handleTitleChange}
-          onBlur={handleBlur}
-          placeholder="제목을 입력하세요"
-          className="w-full bg-transparent text-xl font-bold tracking-tight text-zinc-900 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-50 dark:placeholder:text-zinc-600"
-        />
+      {/* 본문 영역: 편집 모드 vs 뷰어 모드 */}
+      {isEditing ? (
+        <div className="mt-4 flex flex-1 flex-col gap-3">
+          <input
+            type="text"
+            value={title}
+            onChange={handleTitleChange}
+            onBlur={handleBlur}
+            placeholder="제목을 입력하세요"
+            className="w-full bg-transparent text-xl font-bold tracking-tight text-zinc-900 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-50 dark:placeholder:text-zinc-600"
+          />
 
-        <textarea
-          value={content}
-          onChange={handleContentChange}
-          onBlur={handleBlur}
-          placeholder="자유롭게 메모를 적어보세요..."
-          className="min-h-[60vh] w-full flex-1 resize-none bg-transparent text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-600"
-        />
-      </div>
+          <textarea
+            value={content}
+            onChange={handleContentChange}
+            onBlur={handleBlur}
+            placeholder="자유롭게 마크다운 메모를 적어보세요... (- [ ] 체크박스, # 제목, - 목록 등)"
+            className="min-h-[60vh] w-full flex-1 resize-none bg-transparent text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-600"
+          />
+        </div>
+      ) : (
+        <div className="mt-4 flex flex-1 flex-col gap-3">
+          <div className="flex items-baseline justify-between gap-2 border-b border-zinc-100 pb-2 dark:border-zinc-800/60">
+            <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+              {title || (
+                <span className="italic text-zinc-400 dark:text-zinc-600">
+                  제목 없는 메모
+                </span>
+              )}
+            </h1>
+          </div>
+
+          <div
+            onDoubleClick={() => setIsEditing(true)}
+            className="min-h-[50vh] flex-1 py-1"
+          >
+            <MemoBlockList
+              blocks={blocks}
+              onToggleCheckbox={handleToggleCheckbox}
+            />
+          </div>
+        </div>
+      )}
     </main>
   );
 }
