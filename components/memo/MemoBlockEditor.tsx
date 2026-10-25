@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { InlineMarkdownText } from "@/components/memo/InlineMarkdownText";
-import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
+import { MemoFormatToolbar } from "@/components/memo/MemoFormatToolbar";
+import type { FormatType } from "@/services/markdownFormat";
 import {
   generateBlockId,
   stringifyBlocksToMarkdown,
@@ -95,7 +96,6 @@ export function MemoBlockEditor({
   onChangeContent,
   onBlur,
 }: MemoBlockEditorProps) {
-  const { keyboardHeight, isKeyboardOpen } = useVirtualKeyboard();
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [cursorPos, setCursorPos] = useState<"start" | "end" | number>("end");
 
@@ -168,15 +168,7 @@ export function MemoBlockEditor({
     onBlur?.();
   };
 
-  const handleTransformBlock = (
-    targetType:
-      | "checkbox"
-      | "bulletList"
-      | "numberedList"
-      | "heading"
-      | "text"
-      | "divider",
-  ) => {
+  const handleTransformBlock = (targetType: FormatType) => {
     const index = focusedIndex ?? effectiveBlocks.length - 1;
     if (index < 0 || index >= effectiveBlocks.length) {
       return;
@@ -687,110 +679,16 @@ export function MemoBlockEditor({
         }
       })}
 
-      {/* 하단 퀵 서식 툴바 (모바일 & PC 공통 지원) */}
-      <div
-        className="pointer-events-none fixed inset-x-0 z-20 flex justify-center px-4 transition-[bottom] duration-150 ease-out"
-        style={{
-          bottom: isKeyboardOpen
-            ? `${keyboardHeight + 12}px`
-            : "max(1rem, env(safe-area-inset-bottom, 1rem))",
-        }}
-      >
-        <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-zinc-200/90 bg-white/95 p-1.5 shadow-lg backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95">
-          {/* 체크박스 */}
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => handleTransformBlock("checkbox")}
-            title="체크리스트로 변환"
-            className={`flex h-8 items-center gap-1 rounded-xl px-2.5 text-xs font-medium transition ${
-              activeBlock?.type === "checkbox"
-                ? "bg-emerald-600 text-white dark:bg-emerald-500"
-                : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            }`}
-          >
-            <span>✓</span>
-            <span>체크</span>
-          </button>
-
-          {/* 제목 (H1/H2/H3 순환) */}
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => handleTransformBlock("heading")}
-            title="제목으로 변환 (H1/H2/H3)"
-            className={`flex h-8 items-center gap-1 rounded-xl px-2.5 text-xs font-medium transition ${
-              activeBlock?.type === "heading"
-                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-semibold"
-                : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            }`}
-          >
-            <span>
-              {activeBlock?.type === "heading" ? `H${activeBlock.level}` : "H"}
-            </span>
-            <span>제목</span>
-          </button>
-
-          {/* 불릿 목록 */}
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => handleTransformBlock("bulletList")}
-            title="글머리 기호 목록으로 변환"
-            className={`flex h-8 items-center gap-1 rounded-xl px-2.5 text-xs font-medium transition ${
-              activeBlock?.type === "bulletList"
-                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-semibold"
-                : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            }`}
-          >
-            <span>•</span>
-            <span>목록</span>
-          </button>
-
-          {/* 번호 목록 */}
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => handleTransformBlock("numberedList")}
-            title="번호 매기기 목록으로 변환"
-            className={`flex h-8 items-center gap-1 rounded-xl px-2.5 text-xs font-medium transition ${
-              activeBlock?.type === "numberedList"
-                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-semibold"
-                : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            }`}
-          >
-            <span>1.</span>
-            <span>번호</span>
-          </button>
-
-          {/* 일반 본문 */}
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => handleTransformBlock("text")}
-            title="일반 본문으로 변환"
-            className={`flex h-8 items-center gap-1 rounded-xl px-2.5 text-xs font-medium transition ${
-              activeBlock?.type === "text"
-                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-semibold"
-                : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            }`}
-          >
-            <span>T</span>
-            <span>본문</span>
-          </button>
-
-          {/* 구분선 삽입 */}
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => handleTransformBlock("divider")}
-            title="구분선 삽입"
-            className="flex h-8 items-center gap-1 rounded-xl px-2 text-xs font-medium text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-          >
-            <span>―</span>
-          </button>
-        </div>
-      </div>
+      {/* 하단 퀵 서식 툴바 (공통 컴포넌트) */}
+      <MemoFormatToolbar
+        activeType={
+          activeBlock?.type === "divider" ? null : activeBlock?.type
+        }
+        headingLevel={
+          activeBlock?.type === "heading" ? activeBlock.level : undefined
+        }
+        onTransform={handleTransformBlock}
+      />
     </div>
   );
 }
