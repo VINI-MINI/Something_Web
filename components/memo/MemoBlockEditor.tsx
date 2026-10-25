@@ -154,6 +154,26 @@ export function MemoBlockEditor({
       return;
     }
 
+    // 노션 스타일 인라인 단축키 자동 변환: 빈 줄에서 [] 또는 [ ] 입력 후 공백 입력 시 체크박스로 즉시 전환
+    if (targetBlock.type === "text") {
+      const checkboxShortcutMatch = newContent.match(
+        /^\s*[-*]?\s*\[[ ]?\]\s+(.*)$/,
+      );
+      if (checkboxShortcutMatch) {
+        const remainingContent = checkboxShortcutMatch[1];
+        nextBlocks[index] = {
+          id: targetBlock.id,
+          type: "checkbox",
+          checked: false,
+          content: remainingContent,
+        };
+        const nextMarkdown = stringifyBlocksToMarkdown(nextBlocks);
+        onChangeContent?.(nextMarkdown);
+        setCursorPos("start");
+        return;
+      }
+    }
+
     nextBlocks[index] = {
       ...targetBlock,
       content: newContent,
