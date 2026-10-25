@@ -28,6 +28,7 @@ export function useVirtualKeyboard() {
 
     vv.addEventListener("resize", handleViewportChange);
     vv.addEventListener("scroll", handleViewportChange);
+    handleViewportChange();
 
     return () => {
       vv.removeEventListener("resize", handleViewportChange);
