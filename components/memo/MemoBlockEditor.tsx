@@ -50,15 +50,19 @@ function AutoResizeTextarea({
 
   useEffect(() => {
     if (autoFocus && textareaRef.current) {
-      textareaRef.current.focus();
-      const len = textareaRef.current.value.length;
-      if (cursorPos === "start") {
-        textareaRef.current.setSelectionRange(0, 0);
-      } else if (typeof cursorPos === "number") {
-        textareaRef.current.setSelectionRange(cursorPos, cursorPos);
-      } else {
-        textareaRef.current.setSelectionRange(len, len);
-      }
+      const el = textareaRef.current;
+      const timer = setTimeout(() => {
+        el.focus();
+        const len = el.value.length;
+        if (cursorPos === "start") {
+          el.setSelectionRange(0, 0);
+        } else if (typeof cursorPos === "number") {
+          el.setSelectionRange(cursorPos, cursorPos);
+        } else {
+          el.setSelectionRange(len, len);
+        }
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [autoFocus, cursorPos]);
 
@@ -98,12 +102,18 @@ export function MemoBlockEditor({
 }: MemoBlockEditorProps) {
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [cursorPos, setCursorPos] = useState<"start" | "end" | number>("end");
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // 빈 메모일 경우 기본 첫 줄 제공
   const effectiveBlocks: MarkdownBlock[] =
     blocks.length > 0
       ? blocks
       : [{ id: "initial-empty-block", type: "text", content: "" }];
+
+  const isEmptyMemo =
+    effectiveBlocks.length === 1 &&
+    effectiveBlocks[0].type === "text" &&
+    effectiveBlocks[0].content === "";
 
   const handleUpdateBlockContent = (index: number, newContent: string) => {
     const nextBlocks = [...effectiveBlocks];
@@ -142,6 +152,26 @@ export function MemoBlockEditor({
       const nextMarkdown = stringifyBlocksToMarkdown(nextBlocks);
       onChangeContent?.(nextMarkdown);
       return;
+    }
+
+    // 노션 스타일 인라인 단축키 자동 변환: 빈 줄에서 [] 또는 [ ] 입력 후 공백 입력 시 체크박스로 즉시 전환
+    if (targetBlock.type === "text") {
+      const checkboxShortcutMatch = newContent.match(
+        /^\s*[-*]?\s*\[[ ]?\]\s+(.*)$/,
+      );
+      if (checkboxShortcutMatch) {
+        const remainingContent = checkboxShortcutMatch[1];
+        nextBlocks[index] = {
+          id: targetBlock.id,
+          type: "checkbox",
+          checked: false,
+          content: remainingContent,
+        };
+        const nextMarkdown = stringifyBlocksToMarkdown(nextBlocks);
+        onChangeContent?.(nextMarkdown);
+        setCursorPos("start");
+        return;
+      }
     }
 
     nextBlocks[index] = {
@@ -441,12 +471,45 @@ export function MemoBlockEditor({
     }
   };
 
+  const handleEmptyAreaAction = () => {
+    const lastIndex = effectiveBlocks.length - 1;
+    if (lastIndex < 0) return;
+
+    const lastBlock = effectiveBlocks[lastIndex];
+    if (lastBlock.type === "divider") {
+      const nextBlocks = [
+        ...effectiveBlocks,
+        { id: generateBlockId(), type: "text" as const, content: "" },
+      ];
+      const nextMarkdown = stringifyBlocksToMarkdown(nextBlocks);
+      onChangeContent?.(nextMarkdown);
+      setFocusedIndex(nextBlocks.length - 1);
+      setCursorPos("start");
+    } else {
+      setFocusedIndex(lastIndex);
+      setCursorPos("end");
+      setTimeout(() => {
+        const textareas = containerRef.current?.querySelectorAll("textarea");
+        const targetTextarea = textareas?.[textareas.length - 1];
+        if (targetTextarea) {
+          targetTextarea.focus();
+          const len = targetTextarea.value.length;
+          targetTextarea.setSelectionRange(len, len);
+        }
+      }, 50);
+    }
+  };
+
   const activeBlock =
     focusedIndex !== null ? effectiveBlocks[focusedIndex] : null;
 
   return (
-    <div className="flex flex-1 flex-col py-1 pb-24">
-      {effectiveBlocks.map((block, index) => {
+    <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
+      <div
+        ref={containerRef}
+        className="flex flex-1 flex-col overflow-y-auto py-1"
+      >
+        {effectiveBlocks.map((block, index) => {
         const isFocused = focusedIndex === index;
 
         switch (block.type) {
@@ -454,6 +517,7 @@ export function MemoBlockEditor({
             return (
               <div
                 key={block.id}
+                data-block-item
                 className="group flex items-start gap-2.5 py-1"
               >
                 <button
@@ -526,7 +590,7 @@ export function MemoBlockEditor({
                   : "mt-2.5 mb-1";
 
             return (
-              <div key={block.id} className={spacingClass}>
+              <div key={block.id} data-block-item className={spacingClass}>
                 {isFocused ? (
                   <AutoResizeTextarea
                     value={block.content}
@@ -561,6 +625,7 @@ export function MemoBlockEditor({
             return (
               <div
                 key={block.id}
+                data-block-item
                 className="flex items-start gap-2.5 py-0.5 pl-1 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200"
               >
                 <span className="select-none text-zinc-400 dark:text-zinc-500">
@@ -600,6 +665,7 @@ export function MemoBlockEditor({
             return (
               <div
                 key={block.id}
+                data-block-item
                 className="flex items-start gap-2 py-0.5 pl-1 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200"
               >
                 <span className="min-w-[1.25rem] select-none text-xs font-semibold tabular-nums text-zinc-400 dark:text-zinc-500">
@@ -637,7 +703,7 @@ export function MemoBlockEditor({
 
           case "divider": {
             return (
-              <div key={block.id} className="py-1">
+              <div key={block.id} data-block-item className="py-1">
                 <hr className="my-3 border-t border-zinc-200 dark:border-zinc-800" />
               </div>
             );
@@ -645,18 +711,26 @@ export function MemoBlockEditor({
 
           case "text":
           default: {
+            const isSingleEmptyBlock = isEmptyMemo && index === 0;
+
             return (
-              <div key={block.id} className="py-0.5">
+              <div
+                key={block.id}
+                data-block-item
+                className={`py-0.5 ${isSingleEmptyBlock ? "flex flex-1 flex-col" : ""}`}
+              >
                 {isFocused ? (
                   <AutoResizeTextarea
                     value={block.content}
                     onChange={(val) => handleUpdateBlockContent(index, val)}
                     onKeyDown={(e) => handleKeyDown(index, block, e)}
                     onBlur={handleInputBlur}
-                    placeholder=""
+                    placeholder={isSingleEmptyBlock ? "메모를 입력하세요..." : ""}
                     autoFocus
                     cursorPos={cursorPos}
-                    className="min-h-[1.5rem] w-full text-sm leading-relaxed text-zinc-800 dark:text-zinc-200"
+                    className={`w-full text-sm leading-relaxed text-zinc-800 dark:text-zinc-200 ${
+                      isSingleEmptyBlock ? "min-h-[40vh] flex-1" : "min-h-[1.5rem]"
+                    }`}
                   />
                 ) : (
                   <div
@@ -664,10 +738,16 @@ export function MemoBlockEditor({
                       setFocusedIndex(index);
                       setCursorPos("end");
                     }}
-                    className="min-h-[1.5rem] w-full cursor-text text-sm leading-relaxed text-zinc-800 dark:text-zinc-200"
+                    className={`w-full cursor-text text-sm leading-relaxed text-zinc-800 dark:text-zinc-200 ${
+                      isSingleEmptyBlock ? "min-h-[40vh] flex-1" : "min-h-[1.5rem]"
+                    }`}
                   >
                     {block.content ? (
                       <InlineMarkdownText text={block.content} />
+                    ) : isSingleEmptyBlock ? (
+                      <span className="select-none text-zinc-400 dark:text-zinc-600">
+                        메모를 입력하세요...
+                      </span>
                     ) : (
                       "\u00A0"
                     )}
@@ -678,6 +758,17 @@ export function MemoBlockEditor({
           }
         }
       })}
+
+      {/* 내용이 있는 메모에서 하단 여백 클릭 시 마지막 줄 끝으로 포커스 이동 */}
+      {!isEmptyMemo && (
+        <button
+          type="button"
+          onClick={handleEmptyAreaAction}
+          aria-label="메모 끝으로 이동하여 계속 작성"
+          className="min-h-[35vh] w-full flex-1 cursor-text border-none bg-transparent p-0 text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-600 rounded-lg"
+        />
+      )}
+    </div>
 
       {/* 하단 퀵 서식 툴바 (공통 컴포넌트) */}
       <MemoFormatToolbar

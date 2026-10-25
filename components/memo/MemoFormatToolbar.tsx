@@ -1,6 +1,5 @@
 "use client";
 
-import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
 import type { FormatType } from "@/services/markdownFormat";
 
 interface MemoFormatToolbarProps {
@@ -11,7 +10,7 @@ interface MemoFormatToolbarProps {
 
 /**
  * 공통 서식 툴바 (블록 편집기 및 마크다운 편집기 공용)
- * - VisualViewport 기반 가상 키보드 높이 자동 감지 및 bottom 위치 연동
+ * - Flex 레이아웃 하단에 자연스럽게 도킹
  * - 포커스 유지를 위해 onMouseDown preventDefault 처리
  */
 export function MemoFormatToolbar({
@@ -19,18 +18,9 @@ export function MemoFormatToolbar({
   headingLevel,
   onTransform,
 }: MemoFormatToolbarProps) {
-  const { keyboardHeight, isKeyboardOpen } = useVirtualKeyboard();
-
   return (
-    <div
-      className="pointer-events-none fixed inset-x-0 z-20 flex justify-center px-2 sm:px-4 transition-[bottom] duration-150 ease-out"
-      style={{
-        bottom: isKeyboardOpen
-          ? `${keyboardHeight + 12}px`
-          : "max(1rem, env(safe-area-inset-bottom, 1rem))",
-      }}
-    >
-      <div className="pointer-events-auto flex max-w-full items-center gap-0.5 overflow-x-auto rounded-2xl border border-zinc-200/90 bg-white/95 p-1 shadow-lg backdrop-blur-md [scrollbar-width:none] [-ms-overflow-style:none] sm:gap-1 sm:p-1.5 dark:border-zinc-800/90 dark:bg-zinc-900/95 [&::-webkit-scrollbar]:hidden">
+    <div className="shrink-0 flex justify-center py-2 px-2 sm:px-4">
+      <div className="flex max-w-full items-center gap-0.5 overflow-x-auto rounded-2xl border border-zinc-200/90 bg-white/95 p-1 shadow-lg backdrop-blur-md [scrollbar-width:none] [-ms-overflow-style:none] sm:gap-1 sm:p-1.5 dark:border-zinc-800/90 dark:bg-zinc-900/95 [&::-webkit-scrollbar]:hidden">
         {/* 체크박스 */}
         <button
           type="button"
