@@ -761,10 +761,11 @@ export function MemoBlockEditor({
 
       {/* 내용이 있는 메모에서 하단 여백 클릭 시 마지막 줄 끝으로 포커스 이동 */}
       {!isEmptyMemo && (
-        <div
+        <button
+          type="button"
           onClick={handleEmptyAreaAction}
-          className="min-h-[35vh] flex-1 cursor-text"
-          aria-hidden="true"
+          aria-label="메모 끝으로 이동하여 계속 작성"
+          className="min-h-[35vh] w-full flex-1 cursor-text border-none bg-transparent p-0 text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-600 rounded-lg"
         />
       )}
     </div>
