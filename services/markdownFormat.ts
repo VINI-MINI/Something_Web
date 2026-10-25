@@ -1,3 +1,5 @@
+import { CHECKBOX_LINE_REGEX } from "@/services/markdownBlock";
+
 export type FormatType =
   | "checkbox"
   | "heading"
@@ -28,8 +30,8 @@ function parseLineFormat(line: string): ParsedLine {
   const indent = indentMatch ? indentMatch[0] : "";
   const trimmed = line.slice(indent.length);
 
-  // 체크박스: - [ ] 또는 - [x]
-  const checkboxMatch = trimmed.match(/^- \[( |x|X)\]\s?(.*)$/);
+  // 체크박스 검사 (markdownBlock의 공통 정규식 활용)
+  const checkboxMatch = trimmed.match(CHECKBOX_LINE_REGEX);
   if (checkboxMatch) {
     return {
       indent,
