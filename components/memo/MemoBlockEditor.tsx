@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { InlineMarkdownText } from "@/components/memo/InlineMarkdownText";
+import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
 import {
   generateBlockId,
   stringifyBlocksToMarkdown,
@@ -94,6 +95,7 @@ export function MemoBlockEditor({
   onChangeContent,
   onBlur,
 }: MemoBlockEditorProps) {
+  const { keyboardHeight, isKeyboardOpen } = useVirtualKeyboard();
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [cursorPos, setCursorPos] = useState<"start" | "end" | number>("end");
 
@@ -686,7 +688,14 @@ export function MemoBlockEditor({
       })}
 
       {/* 하단 퀵 서식 툴바 (모바일 & PC 공통 지원) */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-4 z-20 flex justify-center px-4">
+      <div
+        className="pointer-events-none fixed inset-x-0 z-20 flex justify-center px-4 transition-[bottom] duration-150 ease-out"
+        style={{
+          bottom: isKeyboardOpen
+            ? `${keyboardHeight + 12}px`
+            : "max(1rem, env(safe-area-inset-bottom, 1rem))",
+        }}
+      >
         <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-zinc-200/90 bg-white/95 p-1.5 shadow-lg backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95">
           {/* 체크박스 */}
           <button
