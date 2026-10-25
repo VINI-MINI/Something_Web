@@ -497,16 +497,18 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
             <span>{isEditing ? "완료" : "편집"}</span>
           </button>
 
-          {/* 수동 동기화(저장) 버튼 */}
-          <button
-            type="button"
-            onClick={handleManualSave}
-            disabled={saveStatus === "saving"}
-            className="flex items-center gap-1 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            <span>💾</span>
-            <span>저장</span>
-          </button>
+          {/* 수동 동기화(저장) 버튼 (편집 모드에서만 노출) */}
+          {isEditing && (
+            <button
+              type="button"
+              onClick={handleManualSave}
+              disabled={saveStatus === "saving"}
+              className="flex items-center gap-1 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            >
+              <span>💾</span>
+              <span>저장</span>
+            </button>
+          )}
 
           {/* 상단 고정 토글 버튼 */}
           <button
