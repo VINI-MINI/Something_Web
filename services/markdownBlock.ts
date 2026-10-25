@@ -8,6 +8,13 @@ export function generateBlockId(): string {
   return `b_${Date.now().toString(36)}_${blockCounter}_${randomPart}`;
 }
 
+/**
+ * 체크박스 문법 정규식: - [ ], [ ], * [ ] (공백/들여쓰기 및 괄호 뒤 공백 유무 무관)
+ * 캡처 그룹 1: 체크 여부 (" " 또는 "x"/"X")
+ * 캡처 그룹 2: 본문 내용
+ */
+export const CHECKBOX_LINE_REGEX = /^\s*[-*]?\s*\[([ xX])\]\s*(.*)$/;
+
 export function fromRawText(raw: string, id?: string): MarkdownBlock {
   const blockId = id ?? generateBlockId();
 
@@ -20,7 +27,7 @@ export function fromRawText(raw: string, id?: string): MarkdownBlock {
   }
 
   // 2. 체크박스 검사: - [ ], [ ], * [ ] (공백/들여쓰기 및 괄호 뒤 공백 유무 무관)
-  const checkboxMatch = raw.match(/^\s*[-*]?\s*\[([ xX])\]\s*(.*)$/);
+  const checkboxMatch = raw.match(CHECKBOX_LINE_REGEX);
   if (checkboxMatch) {
     return {
       id: blockId,
