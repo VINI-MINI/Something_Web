@@ -5,11 +5,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { MemoBlockEditor } from "@/components/memo/MemoBlockEditor";
 import { MemoBlockList } from "@/components/memo/MemoBlockList";
+import { MemoFormatToolbar } from "@/components/memo/MemoFormatToolbar";
 import { useMemoContext } from "@/components/memo/MemoProvider";
 import {
   parseMarkdownToBlocks,
   toggleCheckboxAtLine,
 } from "@/services/markdownBlock";
+import {
+  applyFormatToMarkdownText,
+  detectFormatAtCursor,
+  type FormatType,
+} from "@/services/markdownFormat";
 import { subscribeMemo } from "@/services/memoClient";
 import type { Memo } from "@/types/memo";
 
@@ -35,7 +41,9 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [conflictMemo, setConflictMemo] = useState<Memo | null>(null);
+  const [rawCursorOffset, setRawCursorOffset] = useState<number>(0);
 
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const loadedMemoIdRef = useRef<string | null>(null);
   const saveRevisionRef = useRef(0);
@@ -254,6 +262,34 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   const handleBlockContentChange = (newContent: string) => {
     setContent(newContent);
     triggerDebouncedSave(title, newContent);
+  };
+
+  const rawActiveFormat = useMemo(() => {
+    if (editSubMode !== "raw") {
+      return { activeType: null, level: undefined };
+    }
+    return detectFormatAtCursor(content, rawCursorOffset);
+  }, [content, editSubMode, rawCursorOffset]);
+
+  const handleRawTransform = (targetType: FormatType) => {
+    const textarea = textareaRef.current;
+    const start = textarea ? textarea.selectionStart : content.length;
+    const end = textarea ? textarea.selectionEnd : content.length;
+
+    const result = applyFormatToMarkdownText(content, start, end, targetType);
+    setContent(result.nextContent);
+    triggerDebouncedSave(title, result.nextContent);
+
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(
+          result.nextSelectionStart,
+          result.nextSelectionEnd,
+        );
+        setRawCursorOffset(result.nextSelectionStart);
+      }
+    });
   };
 
   const handleManualSave = async () => {
@@ -595,13 +631,30 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
               onBlur={handleBlur}
             />
           ) : (
-            <textarea
-              value={content}
-              onChange={handleContentChange}
-              onBlur={handleBlur}
-              placeholder="자유롭게 마크다운 메모를 적어보세요... (- [ ] 체크박스, # 제목, - 목록 등)"
-              className="min-h-[60vh] w-full flex-1 resize-none bg-transparent text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-600"
-            />
+            <>
+              <textarea
+                ref={textareaRef}
+                value={content}
+                onChange={handleContentChange}
+                onBlur={handleBlur}
+                onSelect={(e) =>
+                  setRawCursorOffset(e.currentTarget.selectionStart)
+                }
+                onKeyUp={(e) =>
+                  setRawCursorOffset(e.currentTarget.selectionStart)
+                }
+                onClick={(e) =>
+                  setRawCursorOffset(e.currentTarget.selectionStart)
+                }
+                placeholder="자유롭게 마크다운 메모를 적어보세요... (- [ ] 체크박스, # 제목, - 목록 등)"
+                className="min-h-[60vh] w-full flex-1 resize-none bg-transparent pb-24 text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-600"
+              />
+              <MemoFormatToolbar
+                activeType={rawActiveFormat.activeType}
+                headingLevel={rawActiveFormat.level}
+                onTransform={handleRawTransform}
+              />
+            </>
           )}
         </div>
       ) : (
