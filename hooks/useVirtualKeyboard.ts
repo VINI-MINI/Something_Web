@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
  */
 export function useVirtualKeyboard() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.visualViewport) {
@@ -24,6 +25,7 @@ export function useVirtualKeyboard() {
       } else {
         setKeyboardHeight(0);
       }
+      setViewportHeight(Math.round(vv.height));
     };
 
     vv.addEventListener("resize", handleViewportChange);
@@ -38,6 +40,7 @@ export function useVirtualKeyboard() {
 
   return {
     keyboardHeight,
+    viewportHeight,
     isKeyboardOpen: keyboardHeight > 0,
   };
 }
