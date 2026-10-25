@@ -451,7 +451,7 @@ export function MemoBlockEditor({
     focusedIndex !== null ? effectiveBlocks[focusedIndex] : null;
 
   return (
-    <div className="flex flex-1 flex-col py-1">
+    <div className="flex flex-1 flex-col py-1 pb-24">
       {effectiveBlocks.map((block, index) => {
         const isFocused = focusedIndex === index;
 
@@ -686,8 +686,8 @@ export function MemoBlockEditor({
       })}
 
       {/* 하단 퀵 서식 툴바 (모바일 & PC 공통 지원) */}
-      <div className="sticky bottom-4 z-20 mt-6 flex justify-center">
-        <div className="flex items-center gap-1 rounded-2xl border border-zinc-200/90 bg-white/95 p-1.5 shadow-lg backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95">
+      <div className="pointer-events-none fixed inset-x-0 bottom-4 z-20 flex justify-center px-4">
+        <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-zinc-200/90 bg-white/95 p-1.5 shadow-lg backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95">
           {/* 체크박스 */}
           <button
             type="button"
