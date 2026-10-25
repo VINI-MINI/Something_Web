@@ -445,8 +445,9 @@ export function MemoBlockEditor({
     focusedIndex !== null ? effectiveBlocks[focusedIndex] : null;
 
   return (
-    <div className="flex flex-1 flex-col py-1 pb-24">
-      {effectiveBlocks.map((block, index) => {
+    <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
+      <div className="flex-1 overflow-y-auto py-1">
+        {effectiveBlocks.map((block, index) => {
         const isFocused = focusedIndex === index;
 
         switch (block.type) {
@@ -678,6 +679,7 @@ export function MemoBlockEditor({
           }
         }
       })}
+      </div>
 
       {/* 하단 퀵 서식 툴바 (공통 컴포넌트) */}
       <MemoFormatToolbar

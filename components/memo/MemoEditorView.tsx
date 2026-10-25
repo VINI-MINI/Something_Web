@@ -7,6 +7,7 @@ import { MemoBlockEditor } from "@/components/memo/MemoBlockEditor";
 import { MemoBlockList } from "@/components/memo/MemoBlockList";
 import { MemoFormatToolbar } from "@/components/memo/MemoFormatToolbar";
 import { useMemoContext } from "@/components/memo/MemoProvider";
+import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
 import {
   parseMarkdownToBlocks,
   toggleCheckboxAtLine,
@@ -30,6 +31,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { deleteMemo, fetchMemo, updateMemo } = useMemoContext();
+  const { viewportHeight, isKeyboardOpen } = useVirtualKeyboard();
 
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [memoNotFound, setMemoNotFound] = useState(false);
@@ -442,9 +444,17 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
   }
 
   return (
-    <main className="flex flex-1 flex-col mx-auto w-full max-w-2xl p-4 sm:p-6">
+    <main
+      className="mx-auto flex w-full max-w-2xl flex-col overflow-hidden p-4 sm:p-6"
+      style={{
+        height:
+          isKeyboardOpen && viewportHeight ? `${viewportHeight}px` : "100dvh",
+        maxHeight:
+          isKeyboardOpen && viewportHeight ? `${viewportHeight}px` : "100dvh",
+      }}
+    >
       {/* 상단 툴바 */}
-      <div className="flex items-center justify-between border-b border-zinc-200 pb-3 dark:border-zinc-800">
+      <div className="shrink-0 flex items-center justify-between border-b border-zinc-200 pb-3 dark:border-zinc-800">
         <button
           type="button"
           onClick={() => router.push("/")}
@@ -524,7 +534,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
 
       {/* 동시 편집 충돌 알림 배너 */}
       {conflictMemo && (
-        <div className="mt-3 flex flex-col gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="shrink-0 mt-3 flex flex-col gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 font-semibold">
               <span className="text-base">💡</span>
@@ -574,25 +584,25 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
       )}
 
       {errorMessage && (
-        <div className="mt-2 rounded-xl bg-rose-50 p-2.5 text-xs text-rose-600 dark:bg-rose-950/40 dark:text-rose-400">
+        <div className="shrink-0 mt-2 rounded-xl bg-rose-50 p-2.5 text-xs text-rose-600 dark:bg-rose-950/40 dark:text-rose-400">
           {errorMessage}
         </div>
       )}
 
       {/* 본문 영역: 편집 모드 vs 뷰어 모드 */}
       {isEditing ? (
-        <div className="mt-4 flex flex-1 flex-col gap-3">
+        <div className="mt-3 flex flex-1 flex-col min-h-0 overflow-hidden gap-2">
           <input
             type="text"
             value={title}
             onChange={handleTitleChange}
             onBlur={handleBlur}
             placeholder="제목을 입력하세요"
-            className="w-full bg-transparent text-xl font-bold tracking-tight text-zinc-900 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-50 dark:placeholder:text-zinc-600"
+            className="shrink-0 w-full bg-transparent text-xl font-bold tracking-tight text-zinc-900 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-50 dark:placeholder:text-zinc-600"
           />
 
           {/* 편집 서브 모드 전환 탭 (블록 편집 vs 마크다운) */}
-          <div className="flex items-center justify-between border-b border-zinc-100 pb-2 dark:border-zinc-800">
+          <div className="shrink-0 flex items-center justify-between border-b border-zinc-100 pb-2 dark:border-zinc-800">
             <div className="flex items-center gap-1 rounded-lg bg-zinc-100 p-0.5 text-xs dark:bg-zinc-800">
               <button
                 type="button"
@@ -631,7 +641,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
               onBlur={handleBlur}
             />
           ) : (
-            <>
+            <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
               <textarea
                 ref={textareaRef}
                 value={content}
@@ -647,19 +657,19 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
                   setRawCursorOffset(e.currentTarget.selectionStart)
                 }
                 placeholder="자유롭게 마크다운 메모를 적어보세요... (- [ ] 체크박스, # 제목, - 목록 등)"
-                className="min-h-[60vh] w-full flex-1 resize-none bg-transparent pb-24 text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-600"
+                className="min-h-0 w-full flex-1 resize-none overflow-y-auto bg-transparent py-1 text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-600"
               />
               <MemoFormatToolbar
                 activeType={rawActiveFormat.activeType}
                 headingLevel={rawActiveFormat.level}
                 onTransform={handleRawTransform}
               />
-            </>
+            </div>
           )}
         </div>
       ) : (
-        <div className="mt-4 flex flex-1 flex-col gap-3">
-          <div className="flex items-baseline justify-between gap-2 border-b border-zinc-100 pb-2 dark:border-zinc-800/60">
+        <div className="mt-3 flex flex-1 flex-col min-h-0 overflow-hidden gap-2">
+          <div className="shrink-0 flex items-baseline justify-between gap-2 border-b border-zinc-100 pb-2 dark:border-zinc-800/60">
             <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
               {title || (
                 <span className="italic text-zinc-400 dark:text-zinc-600">
@@ -671,7 +681,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
 
           <div
             onDoubleClick={() => setIsEditing(true)}
-            className="min-h-[50vh] flex-1 py-1"
+            className="min-h-0 flex-1 overflow-y-auto py-1"
           >
             <MemoBlockList
               blocks={blocks}
