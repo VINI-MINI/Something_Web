@@ -464,7 +464,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
           <span>목록</span>
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* 동기화 상태 표시 */}
           <div className="flex items-center gap-1.5 text-xs">
             {saveStatus === "saving" && (
@@ -475,7 +475,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
             )}
             {saveStatus === "saved" && (
               <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                저장됨 ✓
+                <span className="hidden sm:inline">저장됨 </span>✓
               </span>
             )}
             {saveStatus === "error" && (
@@ -502,7 +502,7 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
             type="button"
             onClick={handleManualSave}
             disabled={saveStatus === "saving"}
-            className="flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="flex items-center gap-1 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
             <span>💾</span>
             <span>저장</span>
@@ -513,11 +513,14 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
             type="button"
             onClick={handleTogglePin}
             title={isPinned ? "고정 해제" : "상단 고정"}
-            className={`rounded-lg p-1.5 text-sm transition hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
-              isPinned ? "text-amber-500" : "text-zinc-400 hover:text-zinc-600"
+            className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow-sm transition ${
+              isPinned
+                ? "bg-amber-500 text-white hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500"
+                : "bg-zinc-100 text-zinc-800 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
             }`}
           >
-            📌
+            <span>📌</span>
+            <span>{isPinned ? "고정됨" : "고정"}</span>
           </button>
 
           {/* 삭제 버튼 */}
@@ -525,9 +528,10 @@ export function MemoEditorView({ memoId }: MemoEditorViewProps) {
             type="button"
             onClick={handleDelete}
             title="메모 삭제"
-            className="rounded-lg p-1.5 text-sm text-zinc-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
+            className="flex items-center gap-1 rounded-lg bg-zinc-100 px-2.5 py-1.5 text-xs font-semibold text-zinc-600 transition hover:bg-rose-50 hover:text-rose-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
           >
-            🗑️
+            <span>🗑️</span>
+            <span>삭제</span>
           </button>
         </div>
       </div>
